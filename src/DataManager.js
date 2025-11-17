@@ -1,30 +1,54 @@
 // /src/DataManager.js
 
-import { GADGETS } from './gameConfig.js'; // Импортируем гаджеты
-const SAVE_KEY = 'kitchenSortSaveData';
+import { GADGETS } from './gameConfig.js';
+
+const SAVE_KEY = 'playerData'; // Ключ, под которым все данные будут храниться в облаке
 
 class DataManager {
     constructor() {
-        this.playerData = this.load();
+        this.player = null; // Здесь будет храниться объект игрока из Yandex SDK
+        this.playerData = null; // Здесь будут кэшироваться данные игрока
     }
 
-    // Метод загрузки данных
-    load() {
-        const dataString = localStorage.getItem(SAVE_KEY);
-        if (dataString) {
-            // Если данные есть, превращаем их из строки обратно в объект
-            return JSON.parse(dataString);
-        } else {
-            // Если данных нет (первый запуск), создаем стандартный объект
-            return this.getDefaultData();
+    // Метод инициализации. Должен быть вызван после получения ysdk.player
+    async init(player) {
+        this.player = player;
+        console.log('DataManager initialized with Yandex Player object.');
+        return this.load();
+    }
+
+    // Метод загрузки данных из облака
+    async load() {
+        try {
+            const data = await this.player.getData([SAVE_KEY]);
+            if (data && data[SAVE_KEY]) {
+                this.playerData = data[SAVE_KEY];
+                console.log('Player data loaded from cloud:', this.playerData);
+            } else {
+                console.log('No data in cloud. Using default data.');
+                this.playerData = this.getDefaultData();
+                // Сразу сохраняем дефолтные данные в облако
+                await this.save();
+            }
+        } catch (error) {
+            console.error('Failed to load player data from cloud:', error);
+            // Если произошла ошибка, используем временные локальные данные
+            this.playerData = this.getDefaultData();
         }
     }
 
-    // Метод сохранения данных
-    save() {
-        // Превращаем наш объект с данными в строку и сохраняем в localStorage
-        localStorage.setItem(SAVE_KEY, JSON.stringify(this.playerData));
-        console.log('Game data saved!', this.playerData);
+    // Метод сохранения данных в облако
+    async save() {
+        if (!this.player) {
+            console.error('Cannot save data: Player object is not initialized.');
+            return;
+        }
+        try {
+            await this.player.setData({ [SAVE_KEY]: this.playerData }, true); // true = flush immediately
+            console.log('Game data saved to cloud!', this.playerData);
+        } catch (error) {
+            console.error('Failed to save player data to cloud:', error);
+        }
     }
 
     // Открывает новый ингредиент
@@ -32,9 +56,9 @@ class DataManager {
         if (!this.playerData.unlockedItems.includes(type)) {
             this.playerData.unlockedItems.push(type);
             this.save(); // Сохраняем прогресс сразу после открытия
-            return true; // Возвращаем true, если это было новое открытие
+            return true;
         }
-        return false; // Возвращаем false, если уже был открыт
+        return false;
     }
 
     // Проверяет, открыт ли ингредиент
@@ -43,16 +67,22 @@ class DataManager {
     }
 
     getCoins() { return this.playerData.coins; }
+    
     addCoins(amount) {
         this.playerData.coins += amount;
-        // Не сохраняем здесь, чтобы не делать это каждый раз. Сохраним в конце хода.
+        // Сохранение будет вызвано в конце хода (в handleMerge)
     }
+
     removeCoins(amount) {
         this.playerData.coins -= amount;
-        // Убираем save() и отсюда. Будем сохранять в методе upgradeGadget.
+        // Сохранение будет вызвано в методе upgradeGadget
     }
 
     getGadgetLevel(gadgetId) {
+        // Добавлена проверка на случай, если в сохранениях нет такого гаджета
+        if (!this.playerData.gadgets[gadgetId + 'Level']) {
+            return 0;
+        }
         return this.playerData.gadgets[gadgetId + 'Level'];
     }
 
@@ -67,7 +97,7 @@ class DataManager {
         if (this.playerData.coins >= cost) {
             this.removeCoins(cost);
             this.playerData.gadgets[gadgetId + 'Level']++;
-            this.save();
+            this.save(); // Сохраняем после успешного апгрейда
             return true;
         }
         return false;
@@ -77,7 +107,7 @@ class DataManager {
     getDefaultData() {
         return {
             coins: 0,
-            unlockedItems: ['egg', 'tomato'], // Базовые ингредиенты открыты с самого начала
+            unlockedItems: ['egg', 'tomato'],
             gadgets: {
                 knifeLevel: 0,
                 spatulaLevel: 0
@@ -86,5 +116,5 @@ class DataManager {
     }
 }
 
-// Создаем один-единственный экземпляр менеджера, который будет использоваться всей игрой
+// Экспортируем один-единственный экземпляр
 export const dataManager = new DataManager();

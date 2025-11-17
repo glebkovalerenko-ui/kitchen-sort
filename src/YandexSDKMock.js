@@ -1,0 +1,71 @@
+// /src/YandexSDKMock.js
+// Это "заглушка" для Yandex Games SDK, чтобы игра работала локально.
+
+console.warn('YANDEX SDK MOCK IS RUNNING!');
+
+// --- Имитация сохранения данных (Player) ---
+// Мы используем localStorage, чтобы прогресс сохранялся между локальными сессиями
+const localStorageMock = {
+    playerData: {},
+
+    init: function() {
+        const data = localStorage.getItem('kitchenSortSaveData_mock');
+        this.playerData = data ? JSON.parse(data) : {};
+        return Promise.resolve(this);
+    },
+
+    getData: function(keys) {
+        console.log('[MOCK SDK] Player.getData called with keys:', keys);
+        const result = {};
+        keys.forEach(key => {
+            if (this.playerData[key]) {
+                result[key] = this.playerData[key];
+            }
+        });
+        return Promise.resolve(result);
+    },
+
+    setData: function(data, flush) {
+        console.log('[MOCK SDK] Player.setData called with data:', data, 'Flush:', flush);
+        Object.keys(data).forEach(key => {
+            this.playerData[key] = data[key];
+        });
+        localStorage.setItem('kitchenSortSaveData_mock', JSON.stringify(this.playerData));
+        return Promise.resolve();
+    }
+};
+
+// --- Имитация рекламы (Adv) ---
+const advMock = {
+    showFullscreenAdv: function(callbacks) {
+        console.log('[MOCK SDK] Adv.showFullscreenAdv called.');
+        setTimeout(() => {
+            console.log('[MOCK SDK] Interstitial Ad "closed".');
+            callbacks.callbacks.onClose(true); // true = реклама была показана
+        }, 500); // Имитируем небольшую задержку
+    },
+
+    showRewardedVideo: function(callbacks) {
+        console.log('[MOCK SDK] Adv.showRewardedVideo called.');
+        setTimeout(() => {
+            console.log('[MOCK SDK] Rewarded Ad "watched" and "closed".');
+            callbacks.callbacks.onRewarded();
+            callbacks.callbacks.onClose();
+        }, 1000); // Имитируем задержку просмотра
+    }
+};
+
+
+// --- Создаем глобальный объект YaGames ---
+window.YaGames = {
+    init: () => {
+        console.log('[MOCK SDK] YaGames.init called.');
+        return Promise.resolve({
+            adv: advMock,
+            getPlayer: () => {
+                console.log('[MOCK SDK] ysdk.getPlayer called.');
+                return localStorageMock.init();
+            }
+        });
+    }
+};

@@ -4,8 +4,29 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kitchen Sort</title>
-    <script src="https://yandex.ru/games/sdk/v2"></script>
-    <script>YaGames.init();</script>
+    
+    <!-- Этот блок будет динамически подключать нужный скрипт -->
+    <script>
+        (function() {
+            // Проверяем, запущена ли игра локально
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            
+            const script = document.createElement('script');
+            
+            if (isLocal) {
+                // Если локально, подключаем нашу заглушку
+                script.src = '/src/YandexSDKMock.js';
+                console.log('Loading Yandex SDK Mock for local development.');
+            } else {
+                // Если на сервере, подключаем настоящий SDK
+                script.src = 'https://yandex.ru/games/sdk/v2';
+                console.log('Loading official Yandex SDK.');
+            }
+            
+            document.head.appendChild(script);
+        }());
+    </script>
+    
     <style>
         body { margin: 0; background-color: #111; display: flex; justify-content: center; align-items: center; height: 100vh; }
     </style>

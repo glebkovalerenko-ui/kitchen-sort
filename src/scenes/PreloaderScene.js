@@ -1,6 +1,7 @@
 // /src/scenes/PreloaderScene.js
 import Phaser from 'phaser';
 import { adManager } from '../AdManager.js';
+import { dataManager } from '../DataManager.js'; // Импортируем DataManager
 
 export default class PreloaderScene extends Phaser.Scene {
     constructor() {
@@ -19,31 +20,38 @@ export default class PreloaderScene extends Phaser.Scene {
         // TODO: Добавить сюда остальные изображения
 
         // Загружаем изображения UI
-        this.load.image('button', 'assets/ui_button_default.png'); // Предполагаем, что у тебя есть этот файл
+        this.load.image('button', 'assets/ui_button_default.png');
 
         // Загружаем звуки
         this.load.audio('merge_sfx', 'assets/merge.mp3');
         // TODO: Добавить сюда остальные звуки
     }
 
-    create() {
-        // --- НОВЫЙ КОД ИНИЦИАЛИЗАЦИИ ---
-        // YaGames доступен глобально, так как мы подключили его в index.html
-        YaGames.init()
-            .then(ysdk => {
-                console.log('Yandex SDK is ready!');
-                // Инициализируем наш AdManager, передавая ему готовый SDK
-                adManager.init(ysdk);
-                
-                // Теперь, когда все готово, запускаем игру
-                this.startGame();
-            })
-            .catch(err => {
-                console.error('Yandex SDK init error:', err);
-                // Даже если SDK не загрузился (например, из-за блокировщика рекламы),
-                // мы все равно запускаем игру, но реклама работать не будет.
-                this.startGame();
-            });
+    async create() {
+        console.log('Initializing Yandex SDK...');
+        try {
+            const ysdk = await YaGames.init();
+            console.log('Yandex SDK is ready!');
+            
+            // Инициализируем AdManager
+            adManager.init(ysdk);
+
+            // Получаем объект игрока для работы с сохранениями
+            const player = await ysdk.getPlayer();
+            
+            // Инициализируем DataManager и ждем загрузки данных
+            await dataManager.init(player);
+
+            // Теперь, когда все готово, запускаем игру
+            this.startGame();
+
+        } catch (err) {
+            console.error('Yandex SDK or Player Data init error:', err);
+            // Даже если SDK не загрузился, мы можем запустить игру,
+            // но сохранения и реклама работать не будут.
+            // DataManager в этом случае будет работать с дефолтными данными.
+            this.startGame();
+        }
     }
 
     startGame() {
