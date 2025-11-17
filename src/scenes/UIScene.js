@@ -8,19 +8,22 @@ export default class UIScene extends Phaser.Scene {
     }
 
     create() {
-        // --- Элементы счёта ---
-        this.scoreText = this.add.text(50, 50, 'Score: 0', { fontSize: '32px', fill: '#ffffff' });
+        // Получаем ссылку на GameScene в самом начале
         const gameScene = this.scene.get('GameScene');
+
+        // --- Элементы счёта (ИСПРАВЛЕНО) ---
+        // ИЗМЕНЕНИЕ: При создании текста, сразу берем актуальный score из GameScene
+        this.scoreText = this.add.text(50, 50, 'Score: ' + gameScene.score, { fontSize: '32px', fill: '#ffffff' });
+        // Слушатель событий остается для будущих обновлений
         gameScene.events.on('updateScore', (score) => { this.scoreText.setText('Score: ' + score); }, this);
 
+        // С монетами уже все было правильно, так как они берутся из dataManager
         this.coinsText = this.add.text(50, 90, 'Coins: ' + dataManager.getCoins(), { fontSize: '32px', fill: '#ffffff' });
         gameScene.events.on('updateCoins', (coins) => { this.coinsText.setText('Coins: ' + coins); }, this);
         
         // --- Кнопка "Книга Рецептов" ---
         const collectionBtn = this.add.image(this.game.config.width - 150, 70, 'button')
-            // ПРАВИЛЬНЫЙ ПОРЯДОК: Сначала меняем точку опоры...
             .setOrigin(0.5)
-            // ...а потом делаем интерактивным!
             .setInteractive()
             .on('pointerdown', () => {
                 this.scene.pause('GameScene');
@@ -29,12 +32,9 @@ export default class UIScene extends Phaser.Scene {
         this.add.text(collectionBtn.x, collectionBtn.y, 'Book', { fontSize: '28px', fill: '#000'}).setOrigin(0.5);
 
         // --- Кнопка "Магазин Гаджетов" ---
-        // ИЗМЕНЯЕМ КООРДИНАТУ X ЗДЕСЬ!
-        // Старая: this.game.config.width - 350
-        // Новая: Позиция первой кнопки (collectionBtn.x) минус её ширина (240) минус отступ (20)
         const newX = collectionBtn.x - 240 - 20; 
 
-        const upgradeBtn = this.add.image(newX, 70, 'button') // Используем новую координату
+        const upgradeBtn = this.add.image(newX, 70, 'button')
             .setOrigin(0.5)
             .setInteractive()
             .on('pointerdown', () => {
@@ -43,15 +43,15 @@ export default class UIScene extends Phaser.Scene {
             });
         this.add.text(upgradeBtn.x, upgradeBtn.y, 'Shop', { fontSize: '28px', fill: '#000'}).setOrigin(0.5);
         
-        // Оставляем отладчик, чтобы увидеть результат
-        this.drawDebugHitbox(collectionBtn);
-        this.drawDebugHitbox(upgradeBtn);
+        // Отладчик можно убрать, если он больше не нужен
+        // this.drawDebugHitbox(collectionBtn);
+        // this.drawDebugHitbox(upgradeBtn);
     }
     
-    drawDebugHitbox(gameObject) {
-        const hitbox = gameObject.getBounds();
-        const graphics = this.add.graphics();
-        graphics.lineStyle(2, 0xff0000, 0.7);
-        graphics.strokeRectShape(hitbox);
-    }
+    // drawDebugHitbox(gameObject) {
+    //     const hitbox = gameObject.getBounds();
+    //     const graphics = this.add.graphics();
+    //     graphics.lineStyle(2, 0xff0000, 0.7);
+    //     graphics.strokeRectShape(hitbox);
+    // }
 }

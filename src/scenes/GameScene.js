@@ -12,43 +12,40 @@ export default class GameScene extends Phaser.Scene {
     init(data) {
         this.shouldContinue = data.continueGame || false;
         this.savedGridState = data.gridState || null;
+        this.initialScore = data.score || 0;
     }
 
     create() {
-        // --- 1. Настройка сетки и игровых переменных ---
         this.GRID_ROWS = 5;
         this.GRID_COLS = 5;
         this.CELL_SIZE = 100;
         this.GRID_START_X = (this.game.config.width - (this.GRID_COLS * this.CELL_SIZE)) / 2;
         this.GRID_START_Y = (this.game.config.height - (this.GRID_ROWS * this.CELL_SIZE)) / 2;
         
-        this.score = 0;
+        this.score = this.initialScore;
         this.grid = Array(this.GRID_ROWS).fill(0).map(() => Array(this.GRID_COLS).fill(TILE_TYPES.EMPTY));
         this.ingredientsGroup = this.add.group();
 
         this.drawGrid();
         
-        // --- 2. Настройка логики Drag & Drop ---
+        // Эти обработчики теперь будут работать, так как методы восстановлены
         this.input.on('dragstart', this.onDragStart, this);
         this.input.on('drag', this.onDrag, this);
         this.input.on('dragend', this.onDragEnd, this);
 
-        // --- 3. Запуск UI сцены ---
         this.scene.launch('UIScene');
+        this.events.emit('updateScore', this.score); 
 
-        // --- 4. Логика старта игры ---
         if (this.shouldContinue && this.savedGridState) {
             console.log('Continuing game...');
             this.restoreGrid(this.savedGridState);
         } else {
             console.log('Starting new game...');
-            this.score = 0; // Убедимся, что счет сброшен
-            this.events.emit('updateScore', this.score);
             this.spawnInitialIngredients();
         }
     }
 
-    // --- Методы для перетаскивания ---
+    // --- ВОССТАНОВЛЕННЫЕ МЕТОДЫ ДЛЯ ПЕРЕТАСКИВАНИЯ ---
     onDragStart(pointer, gameObject) {
         this.children.bringToTop(gameObject);
         gameObject.setScale(gameObject.getData('baseScale') * 1.1);
@@ -65,19 +62,21 @@ export default class GameScene extends Phaser.Scene {
         const gridX = Math.floor((pointer.x - this.GRID_START_X) / this.CELL_SIZE);
         const gridY = Math.floor((pointer.y - this.GRID_START_Y) / this.CELL_SIZE);
 
+        let merged = false;
         if (this.isValidGridPosition(gridX, gridY)) {
             const targetObject = this.grid[gridY][gridX];
             if (targetObject && targetObject.getData('type') === gameObject.getData('type') && targetObject !== gameObject) {
                 this.handleMerge(gameObject, targetObject);
-            } else {
-                this.snapToGrid(gameObject);
+                merged = true;
             }
-        } else {
+        }
+
+        if (!merged) {
             this.snapToGrid(gameObject);
+            this.checkGameOverConditions();
         }
     }
 
-    // --- Основные игровые методы ---
     handleMerge(draggedObject, targetObject) {
         this.sound.play('merge_sfx');
         const type = draggedObject.getData('type');
@@ -110,7 +109,6 @@ export default class GameScene extends Phaser.Scene {
         const isNewUnlock = dataManager.unlockIngredient(recipe.mergeTo);
         if (isNewUnlock) {
             console.log('NEW UNLOCK:', recipe.mergeTo);
-            // TODO: Показать красивую анимацию "Новый рецепт открыт!"
         }
 
         this.grid[draggedObject.getData('gridY')][draggedObject.getData('gridX')] = TILE_TYPES.EMPTY;
@@ -119,11 +117,11 @@ export default class GameScene extends Phaser.Scene {
         targetObject.destroy();
 
         this.createIngredient(targetGridX, targetGridY, recipe.mergeTo);
-        this.checkAndSpawn(2); // Заменяем прямой вызов спауна на проверку
+        this.checkAndSpawn(2);
     }
 
     spawnInitialIngredients() {
-        for (let i = 0; i < 10; i++) { // Увеличим начальное количество для динамики
+        for (let i = 0; i < 10; i++) {
             this.spawnNewIngredient();
         }
     }
@@ -132,15 +130,7 @@ export default class GameScene extends Phaser.Scene {
         for (let i = 0; i < count; i++) {
             this.spawnNewIngredient();
         }
-        
-        // После спауна проверяем, не закончилась ли игра
-        const emptyCell = this.findEmptyCell();
-        if (!emptyCell) {
-            // Если пустых ячеек нет, проверяем наличие ходов
-            if (!this.checkForPossibleMoves()) {
-                this.triggerGameOver();
-            }
-        }
+        this.checkGameOverConditions();
     }
 
     spawnNewIngredient() {
@@ -158,7 +148,11 @@ export default class GameScene extends Phaser.Scene {
         this.scene.start('GameOverScene', { score: this.score, gridState: currentGridState });
     }
 
-    // --- НОВЫЕ И ИЗМЕНЕННЫЕ МЕТОДЫ ---
+    checkGameOverConditions() {
+        if (!this.checkForPossibleMoves()) {
+            this.triggerGameOver();
+        }
+    }
 
     checkForPossibleMoves() {
         const typeCounts = {};
@@ -173,13 +167,13 @@ export default class GameScene extends Phaser.Scene {
         }
 
         for (const type in typeCounts) {
-            if (typeCounts[type] >= 2) {
-                console.log(`Found possible move for type: ${type}`);
-                return true; // Найден возможный ход
+            if (typeCounts[type] >= 2 && RECIPES[type]) {
+                return true;
             }
         }
 
-        return false; // Ходов нет
+        console.log('No possible moves found.');
+        return false;
     }
 
     saveGridState() {
@@ -196,16 +190,13 @@ export default class GameScene extends Phaser.Scene {
     }
 
     restoreGrid(gridState) {
-        // Очищаем текущее поле
         this.ingredientsGroup.clear(true, true);
         this.grid = Array(this.GRID_ROWS).fill(0).map(() => Array(this.GRID_COLS).fill(TILE_TYPES.EMPTY));
 
-        // Восстанавливаем из сохранения
         gridState.forEach(item => {
             this.createIngredient(item.x, item.y, item.type);
         });
 
-        // Очищаем 3 случайные ячейки, чтобы дать игроку шанс
         const cellsToClear = [];
         this.ingredientsGroup.getChildren().forEach(child => {
             cellsToClear.push(child);
@@ -222,10 +213,11 @@ export default class GameScene extends Phaser.Scene {
                 cell.destroy();
             }
         }
+        
+        this.checkAndSpawn(3);
     }
 
-
-    // --- Вспомогательные методы (без изменений) ---
+    // --- Вспомогательные методы ---
     createIngredient(gridX, gridY, type) {
         const pixelX = this.GRID_START_X + gridX * this.CELL_SIZE + this.CELL_SIZE / 2;
         const pixelY = this.GRID_START_Y + gridY * this.CELL_SIZE + this.CELL_SIZE / 2;
