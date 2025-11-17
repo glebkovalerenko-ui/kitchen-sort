@@ -10,17 +10,24 @@ export default class PreloaderScene extends Phaser.Scene {
 
     preload() {
         console.log('Preloading assets...');
-        // Загружаем изображения ингредиентов
+        
+        // Яичная цепочка
         this.load.image('egg', 'assets/egg.png');
         this.load.image('fried_egg', 'assets/fried_egg.png');
         this.load.image('omelette', 'assets/omelette.png');
+        this.load.image('shakshuka', 'assets/shakshuka.png');
+        this.load.image('breakfast_platter', 'assets/breakfast_platter.png');
+
+        // Томатная цепочка
         this.load.image('tomato', 'assets/tomato.png');
         this.load.image('diced_tomatoes', 'assets/diced_tomatoes.png');
         this.load.image('tomato_sauce', 'assets/tomato_sauce.png');
-        // TODO: Добавить сюда остальные изображения
+        this.load.image('tomato_soup', 'assets/tomato_soup.png');
+        this.load.image('gazpacho', 'assets/gazpacho.png');
 
         // Загружаем изображения UI
         this.load.image('button', 'assets/ui_button_default.png');
+        this.load.image('particle', 'assets/particle.png');
 
         // Загружаем звуки
         this.load.audio('merge_sfx', 'assets/merge.mp3');

@@ -77,7 +77,9 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
+    // handleMerge теперь управляет анимацией
     handleMerge(draggedObject, targetObject) {
+        // 1. Сразу проигрываем звук и выполняем всю логику
         this.sound.play('merge_sfx');
         const type = draggedObject.getData('type');
         const recipe = RECIPES[type];
@@ -105,19 +107,60 @@ export default class GameScene extends Phaser.Scene {
 
         this.events.emit('updateScore', this.score);
         this.events.emit('updateCoins', dataManager.getCoins());
-    
+
         const isNewUnlock = dataManager.unlockIngredient(recipe.mergeTo);
         if (isNewUnlock) {
             console.log('NEW UNLOCK:', recipe.mergeTo);
+            // TODO: Показать красивую анимацию "Новый рецепт открыт!"
         }
 
+        // 2. Очищаем логическую сетку
         this.grid[draggedObject.getData('gridY')][draggedObject.getData('gridX')] = TILE_TYPES.EMPTY;
         this.grid[targetGridY][targetGridX] = TILE_TYPES.EMPTY;
-        draggedObject.destroy();
-        targetObject.destroy();
 
-        this.createIngredient(targetGridX, targetGridY, recipe.mergeTo);
-        this.checkAndSpawn(2);
+        const targetPixelX = targetObject.x;
+        const targetPixelY = targetObject.y;
+
+        // 3. Запускаем анимацию исчезновения
+        this.tweens.add({
+            targets: [draggedObject, targetObject],
+            scale: 0,
+            alpha: 0,
+            duration: 200,
+            ease: 'Power2',
+            onComplete: () => {
+                draggedObject.destroy();
+                targetObject.destroy();
+
+                // 4. Создаем "пуф" эффект (Новый, правильный способ для Phaser 3.60+)
+                const emitter = this.add.particles(targetPixelX, targetPixelY, 'particle', {
+                    speed: { min: 50, max: 150 },
+                    angle: { min: 0, max: 360 },
+                    scale: { start: 0.8, end: 0 },
+                    blendMode: 'ADD',
+                    lifespan: 300,
+                    tint: 0xffff00,
+                    emitting: false // Важно: мы управляем взрывом сами
+                });
+                emitter.explode(16); // Взрываем 16 частиц
+
+                // 5. Создаем и анимируем появление нового предмета
+                const newIngredient = this.createIngredient(targetGridX, targetGridY, recipe.mergeTo);
+                const finalScale = newIngredient.scale;
+                newIngredient.setScale(0);
+
+                this.tweens.add({
+                    targets: newIngredient,
+                    scale: finalScale,
+                    duration: 300,
+                    ease: 'Back.easeOut', // Эффект "пружинки"
+                    onComplete: () => {
+                        // 6. После завершения всей анимации, спауним новые предметы
+                        this.checkAndSpawn(2);
+                    }
+                });
+            }
+        });
     }
 
     spawnInitialIngredients() {
