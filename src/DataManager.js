@@ -10,10 +10,9 @@ class DataManager {
         this.player = null;
         this.playerData = null;
         
-        // --- Новые свойства для отложенного сохранения ---
         this.saveTimeout = null;
-        this.isDataDirty = false; // Флаг, показывающий, есть ли несохраненные изменения
-        this.SAVE_DELAY = 2000; // Задержка в 2 секунды
+        this.isDataDirty = false;
+        this.SAVE_DELAY = 2000;
     }
     
     async init(player) {
@@ -25,7 +24,7 @@ class DataManager {
     reset() {
         console.log("Resetting player data to default.");
         this.playerData = this.getDefaultData();
-        this.save(true); // Принудительное немедленное сохранение при сбросе
+        this.save(true);
     }
     
     async load() {
@@ -37,7 +36,7 @@ class DataManager {
             } else {
                 console.log('No data in cloud. Using default data.');
                 this.playerData = this.getDefaultData();
-                await this.save(true); // Принудительное немедленное сохранение
+                await this.save(true);
             }
         } catch (error) {
             console.error('Failed to load player data from cloud:', error);
@@ -45,24 +44,20 @@ class DataManager {
         }
     }
 
-    // Общий метод для пометки данных как "грязных" и запуска таймера сохранения
     markDirty() {
         this.isDataDirty = true;
         
-        // Если таймер уже запущен, сбрасываем его
         if (this.saveTimeout) {
             clearTimeout(this.saveTimeout);
         }
 
-        // Запускаем новый таймер
         this.saveTimeout = setTimeout(() => {
-            this.save(true); // Сохраняем немедленно, когда таймер сработал
+            this.save(true);
         }, this.SAVE_DELAY);
     }
     
     async save(flush = false) {
         if (!this.isDataDirty && flush === false) {
-            // Если данные не менялись и это не принудительное сохранение, ничего не делаем
             return;
         }
         if (!this.player) {
@@ -73,7 +68,7 @@ class DataManager {
         try {
             await this.player.setData({ [SAVE_KEY]: this.playerData }, flush);
             console.log(`Game data saved to cloud! (Flush: ${flush})`, this.playerData);
-            this.isDataDirty = false; // Сбрасываем флаг после успешного сохранения
+            this.isDataDirty = false;
             if (this.saveTimeout) {
                 clearTimeout(this.saveTimeout);
                 this.saveTimeout = null;
@@ -87,7 +82,7 @@ class DataManager {
         if (!this.playerData.unlockedItems.includes(type)) {
             this.playerData.unlockedItems.push(type);
             analyticsManager.trackEntityUnlocked(type);
-            this.markDirty(); // Отмечаем данные для сохранения
+            this.markDirty();
             return true;
         }
         return false;
@@ -101,13 +96,13 @@ class DataManager {
     
     addCoins(amount) {
         this.playerData.coins += amount;
-        this.markDirty(); // Отмечаем данные для сохранения
+        this.markDirty();
     }
 
     removeCoins(amount) {
         if (this.playerData.coins >= amount) {
             this.playerData.coins -= amount;
-            this.markDirty(); // Отмечаем данные для сохранения
+            this.markDirty();
             return true;
         }
         return false;
@@ -131,7 +126,8 @@ class DataManager {
         if (this.removeCoins(cost)) {
             const newLevel = this.playerData.gadgets[gadgetId + 'Level'] + 1;
             this.playerData.gadgets[gadgetId + 'Level'] = newLevel;
-            this.save(true); // Важные покупки сохраняем сразу
+            analyticsManager.trackGadgetUpgraded(gadgetId, newLevel); // ДОБАВЛЕНО
+            this.save(true);
             return true;
         }
         return false;
@@ -193,7 +189,8 @@ class DataManager {
             const state = this.getGeneratorState(generatorId);
             const newLevel = state[upgradeType + 'Level'] + 1;
             state[upgradeType + 'Level'] = newLevel;
-            this.save(true); // Важные покупки сохраняем сразу
+            analyticsManager.trackGeneratorUpgraded(generatorId, upgradeType, newLevel); // ДОБАВЛЕНО
+            this.save(true);
             return true;
         }
         return false;

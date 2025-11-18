@@ -20,16 +20,14 @@ export default class UpgradeScene extends Phaser.Scene {
         });
 
         const backBtn = this.add.image(this.game.config.width / 2, this.game.config.height - 100, 'button')
-            .setOrigin(0.5) // Правильный порядок
+            .setOrigin(0.5)
             .setInteractive()
             .on('pointerdown', () => {
+                this.sound.play('click_sfx');
                 this.scene.resume('GameScene');
                 this.scene.stop();
             });
         this.add.text(backBtn.x, backBtn.y, 'Back', { fontSize: '32px', fill: '#000000' }).setOrigin(0.5);
-
-        // --- ВЫЗЫВАЕМ НАШ ОТЛАДЧИК ДЛЯ КНОПКИ НАЗАД ---
-        this.drawDebugHitbox(backBtn);
     }
 
     createGadgetCard(gadgetId, y) {
@@ -41,29 +39,29 @@ export default class UpgradeScene extends Phaser.Scene {
         this.add.text(100, y + 45, gadget.description, { fontSize: '22px', fill: '#cccccc', wordWrap: { width: 450 } }).setOrigin(0, 0.5);
 
         const buyBtn = this.add.image(this.game.config.width - 150, y, 'button')
-            .setOrigin(0.5) // Правильный порядок
+            .setOrigin(0.5)
             .setInteractive();
         const buyBtnText = this.add.text(buyBtn.x, buyBtn.y, `Buy: ${cost}`, { fontSize: '28px', fill: '#000'}).setOrigin(0.5);
         
         buyBtn.on('pointerdown', () => {
+            this.sound.play('click_sfx');
             if (dataManager.upgradeGadget(gadgetId)) {
-                this.scene.restart();
+                this.scene.restart(); // Перезапускаем сцену, чтобы обновить все данные
+            } else {
+                // НОВЫЙ БЛОК: UI-фидбек при нехватке монет
+                this.tweens.add({
+                    targets: buyBtn,
+                    x: buyBtn.x + 10,
+                    duration: 50,
+                    ease: 'Power1',
+                    yoyo: true,
+                    repeat: 2
+                });
             }
         });
 
         if (dataManager.getCoins() < cost) {
             buyBtn.setTint(0x888888);
         }
-
-        // --- ВЫЗЫВАЕМ НАШ ОТЛАДЧИК ДЛЯ КНОПКИ КУПИТЬ ---
-        this.drawDebugHitbox(buyBtn);
-    }
-
-    // --- ДОБАВЛЯЕМ МЕТОД ОТЛАДЧИКА ---
-    drawDebugHitbox(gameObject) {
-        const hitbox = gameObject.getBounds();
-        const graphics = this.add.graphics();
-        graphics.lineStyle(2, 0xff0000, 0.7);
-        graphics.strokeRectShape(hitbox);
     }
 }
