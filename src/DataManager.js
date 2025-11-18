@@ -1,16 +1,21 @@
 // /src/DataManager.js
 
 import { GADGETS, GENERATORS } from './gameConfig.js';
+import { analyticsManager } from './AnalyticsManager.js';
 
-const SAVE_KEY = 'playerData'; // Ключ, под которым все данные будут храниться в облаке
+const SAVE_KEY = 'playerData';
 
 class DataManager {
     constructor() {
-        this.player = null; // Здесь будет храниться объект игрока из Yandex SDK
-        this.playerData = null; // Здесь будут кэшироваться данные игрока
+        this.player = null;
+        this.playerData = null;
+        
+        // --- Новые свойства для отложенного сохранения ---
+        this.saveTimeout = null;
+        this.isDataDirty = false; // Флаг, показывающий, есть ли несохраненные изменения
+        this.SAVE_DELAY = 2000; // Задержка в 2 секунды
     }
-
-    // Метод инициализации. Должен быть вызван после получения ysdk.player
+    
     async init(player) {
         this.player = player;
         console.log('DataManager initialized with Yandex Player object.');
@@ -20,10 +25,9 @@ class DataManager {
     reset() {
         console.log("Resetting player data to default.");
         this.playerData = this.getDefaultData();
-        this.save();
+        this.save(true); // Принудительное немедленное сохранение при сбросе
     }
-
-    // Метод загрузки данных из облака
+    
     async load() {
         try {
             const data = await this.player.getData([SAVE_KEY]);
@@ -33,41 +37,62 @@ class DataManager {
             } else {
                 console.log('No data in cloud. Using default data.');
                 this.playerData = this.getDefaultData();
-                // Сразу сохраняем дефолтные данные в облако
-                await this.save();
+                await this.save(true); // Принудительное немедленное сохранение
             }
         } catch (error) {
             console.error('Failed to load player data from cloud:', error);
-            // Если произошла ошибка, используем временные локальные данные
             this.playerData = this.getDefaultData();
         }
     }
 
-    // Метод сохранения данных в облако
-    async save() {
+    // Общий метод для пометки данных как "грязных" и запуска таймера сохранения
+    markDirty() {
+        this.isDataDirty = true;
+        
+        // Если таймер уже запущен, сбрасываем его
+        if (this.saveTimeout) {
+            clearTimeout(this.saveTimeout);
+        }
+
+        // Запускаем новый таймер
+        this.saveTimeout = setTimeout(() => {
+            this.save(true); // Сохраняем немедленно, когда таймер сработал
+        }, this.SAVE_DELAY);
+    }
+    
+    async save(flush = false) {
+        if (!this.isDataDirty && flush === false) {
+            // Если данные не менялись и это не принудительное сохранение, ничего не делаем
+            return;
+        }
         if (!this.player) {
             console.error('Cannot save data: Player object is not initialized.');
             return;
         }
+
         try {
-            await this.player.setData({ [SAVE_KEY]: this.playerData }, true); // true = flush immediately
-            console.log('Game data saved to cloud!', this.playerData);
+            await this.player.setData({ [SAVE_KEY]: this.playerData }, flush);
+            console.log(`Game data saved to cloud! (Flush: ${flush})`, this.playerData);
+            this.isDataDirty = false; // Сбрасываем флаг после успешного сохранения
+            if (this.saveTimeout) {
+                clearTimeout(this.saveTimeout);
+                this.saveTimeout = null;
+            }
         } catch (error) {
             console.error('Failed to save player data to cloud:', error);
         }
     }
-
-    // Открывает новый ингредиент
+    
     unlockIngredient(type) {
         if (!this.playerData.unlockedItems.includes(type)) {
             this.playerData.unlockedItems.push(type);
-            this.save(); // Сохраняем прогресс сразу после открытия
+            analyticsManager.trackEntityUnlocked(type);
+            this.markDirty(); // Отмечаем данные для сохранения
             return true;
         }
         return false;
     }
-
-    // Проверяет, открыт ли ингредиент
+    
     isUnlocked(type) {
         return this.playerData.unlockedItems.includes(type);
     }
@@ -76,16 +101,19 @@ class DataManager {
     
     addCoins(amount) {
         this.playerData.coins += amount;
-        // Сохранение будет вызвано в конце хода (в handleMerge)
+        this.markDirty(); // Отмечаем данные для сохранения
     }
 
     removeCoins(amount) {
-        this.playerData.coins -= amount;
-        // Сохранение будет вызвано в методе upgradeGadget
+        if (this.playerData.coins >= amount) {
+            this.playerData.coins -= amount;
+            this.markDirty(); // Отмечаем данные для сохранения
+            return true;
+        }
+        return false;
     }
 
     getGadgetLevel(gadgetId) {
-        // Добавлена проверка на случай, если в сохранениях нет такого гаджета
         if (!this.playerData.gadgets[gadgetId + 'Level']) {
             return 0;
         }
@@ -100,15 +128,15 @@ class DataManager {
 
     upgradeGadget(gadgetId) {
         const cost = this.getGadgetUpgradeCost(gadgetId);
-        if (this.playerData.coins >= cost) {
-            this.removeCoins(cost);
-            this.playerData.gadgets[gadgetId + 'Level']++;
-            this.save(); // Сохраняем после успешного апгрейда
+        if (this.removeCoins(cost)) {
+            const newLevel = this.playerData.gadgets[gadgetId + 'Level'] + 1;
+            this.playerData.gadgets[gadgetId + 'Level'] = newLevel;
+            this.save(true); // Важные покупки сохраняем сразу
             return true;
         }
         return false;
     }
-
+    
     getGeneratorState(generatorId) {
         if (!this.playerData.generators[generatorId]) {
             this.playerData.generators[generatorId] = {
@@ -118,6 +146,7 @@ class DataManager {
                 speedLevel: 0,
                 bonusLevel: 0
             };
+            this.markDirty();
         }
         return this.playerData.generators[generatorId];
     }
@@ -126,14 +155,15 @@ class DataManager {
         const state = this.getGeneratorState(generatorId);
         if (state.charges > 0) {
             state.charges--;
-            this.save();
+            this.markDirty();
             return true;
         }
         return false;
     }
-
+    
     setGeneratorState(generatorId, state) {
         this.playerData.generators[generatorId] = state;
+        this.markDirty();
     }
 
     getGeneratorUpgradeLevel(generatorId, upgradeType) {
@@ -159,11 +189,11 @@ class DataManager {
 
     upgradeGenerator(generatorId, upgradeType) {
         const cost = this.getGeneratorUpgradeCost(generatorId, upgradeType);
-        if (this.getCoins() >= cost) {
-            this.removeCoins(cost);
+        if (this.removeCoins(cost)) {
             const state = this.getGeneratorState(generatorId);
-            state[upgradeType + 'Level']++;
-            this.save();
+            const newLevel = state[upgradeType + 'Level'] + 1;
+            state[upgradeType + 'Level'] = newLevel;
+            this.save(true); // Важные покупки сохраняем сразу
             return true;
         }
         return false;
@@ -182,5 +212,4 @@ class DataManager {
     }
 }
 
-// Экспортируем один-единственный экземпляр
 export const dataManager = new DataManager();

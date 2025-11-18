@@ -111,3 +111,5 @@ export const COOP_SLOTS = [
     { "x": 402, "y": 760, "scale": 0.5 },
     { "x": 615, "y": 720, "scale": 0.5 }
 ];
+
+export const CLEAR_BOARD_COST = 250; // Конфигурация стоимости "Очистить поле"

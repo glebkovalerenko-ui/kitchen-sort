@@ -13,8 +13,9 @@ class AnalyticsManager {
 
     // Общий метод для отправки событий
     trackEvent(eventName, eventParams = {}) {
-        if (!this.ysdk) {
-            console.warn(`[Analytics] Yandex SDK not initialized. Event not sent: ${eventName}`, eventParams);
+        // ДОБАВЛЕНА ПРОВЕРКА НА НАЛИЧИЕ METRICA
+        if (!this.ysdk || !this.ysdk.metrica) {
+            console.warn(`[Analytics] Yandex SDK Metrica is not available. Event not sent: ${eventName}`, eventParams);
             return;
         }
         

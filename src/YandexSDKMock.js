@@ -4,7 +4,6 @@
 console.warn('YANDEX SDK MOCK IS RUNNING!');
 
 // --- Имитация сохранения данных (Player) ---
-// Мы используем localStorage, чтобы прогресс сохранялся между локальными сессиями
 const localStorageMock = {
     playerData: {},
 
@@ -55,6 +54,13 @@ const advMock = {
     }
 };
 
+// --- НОВАЯ ИМИТАЦИЯ АНАЛИТИКИ (Metrica) ---
+const metricaMock = {
+    reachGoal: function(eventName, eventParams) {
+        console.log(`[MOCK SDK] Metrica.reachGoal called. Event: ${eventName}`, eventParams || '');
+    }
+};
+
 
 // --- Создаем глобальный объект YaGames ---
 window.YaGames = {
@@ -62,6 +68,7 @@ window.YaGames = {
         console.log('[MOCK SDK] YaGames.init called.');
         return Promise.resolve({
             adv: advMock,
+            metrica: metricaMock, // ДОБАВЛЕНО
             getPlayer: () => {
                 console.log('[MOCK SDK] ysdk.getPlayer called.');
                 return localStorageMock.init();

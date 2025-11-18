@@ -16,6 +16,7 @@ export default class GameScene extends Phaser.Scene {
         this.shouldContinue = data.continueGame || false;
         this.savedGridState = data.gridState || null;
         this.initialScore = data.score || 0;
+        this.initialCoins = dataManager.getCoins(); // Сохраняем начальное кол-во монет
         this.events.on('resume', this.onSceneResume, this);
     }
 
@@ -28,6 +29,8 @@ export default class GameScene extends Phaser.Scene {
         this.GRID_START_Y = (this.game.config.height - (this.GRID_ROWS * this.CELL_SIZE)) / 2;
         this.score = this.initialScore;
         this.ingredientsGroup = this.add.group();
+        
+        this.sessionStartTime = Date.now(); // ДОБАВЛЕНО: Засекаем время начала сессии
         
         this.gridManager = new GridManager(this);
         this.mergeSystem = new MergeSystem();
@@ -84,7 +87,6 @@ export default class GameScene extends Phaser.Scene {
         const coinsToAdd = Math.round(recipe.coins * coinBonus);
         this.score += scoreToAdd;
         dataManager.addCoins(coinsToAdd);
-        dataManager.save();
         this.events.emit('updateScore', this.score);
         this.events.emit('updateCoins', dataManager.getCoins());
         const isNewUnlock = dataManager.unlockIngredient(recipe.output);
@@ -193,21 +195,33 @@ export default class GameScene extends Phaser.Scene {
     triggerGameOver() {
         console.log("GAME OVER! No more moves.");
         this.sound.play('gameover_sfx');
+        
+        // --- ДОБАВЛЕНА ЛОГИКА ПЕРЕДАЧИ ДАННЫХ ДЛЯ АНАЛИТИКИ ---
+        const sessionDuration = Math.round((Date.now() - this.sessionStartTime) / 1000);
+        const coinsEarned = dataManager.getCoins() - this.initialCoins;
+        
         const currentGridState = this.saveGridState();
         this.scene.stop('UIScene');
-        this.scene.start('GameOverScene', { score: this.score, gridState: currentGridState });
+        this.scene.start('GameOverScene', { 
+            score: this.score, 
+            gridState: currentGridState,
+            sessionDuration: sessionDuration,
+            coinsEarned: coinsEarned
+        });
     }
     
     checkGameOverConditions() {
         if (this.checkForPossibleMoves()) {
             return;
         }
+
         const boardIsFull = !this.gridManager.findEmptyCell();
         const generatorsAreEmpty = this.areGeneratorsEmpty();
+        
         if (boardIsFull || generatorsAreEmpty) {
             this.triggerGameOver();
         } else {
-            console.log("No moves on board, but player can still add items. Game continues.");
+            console.log("No moves on board, but player can still add items (generators are recharging). Game continues.");
         }
     }
 
@@ -292,7 +306,7 @@ export default class GameScene extends Phaser.Scene {
             state.charges = Math.min(capacity, state.charges + 2);
             dataManager.setGeneratorState(id, state);
         }
-        dataManager.save();
+        dataManager.save(true);
         this.updateGeneratorIcons();
         this.checkGameOverConditions();
     }
@@ -318,5 +332,24 @@ export default class GameScene extends Phaser.Scene {
         const pixelX = this.GRID_START_X + gridX * this.CELL_SIZE + this.CELL_SIZE / 2;
         const pixelY = this.GRID_START_Y + gridY * this.CELL_SIZE + this.CELL_SIZE / 2;
         gameObject.setPosition(pixelX, pixelY);
+    }
+    
+    clearBoard() {
+        this.sound.play('swoosh_sfx');
+        
+        const items = this.ingredientsGroup.getChildren();
+        
+        this.tweens.add({
+            targets: items,
+            scale: 0,
+            alpha: 0,
+            duration: 300,
+            ease: 'Power2',
+            onComplete: () => {
+                this.ingredientsGroup.clear(true, true);
+                this.gridManager.clear();
+                this.checkGameOverConditions();
+            }
+        });
     }
 }

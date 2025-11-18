@@ -1,4 +1,5 @@
 // /src/AdManager.js
+import { analyticsManager } from './AnalyticsManager.js';
 
 class AdManager {
     constructor() {
@@ -20,17 +21,19 @@ class AdManager {
         }
 
         this.isAdOpen = true;
-        scene.sound.pauseAll(); // Ставим все звуки на паузу
+        scene.sound.pauseAll();
 
         this.ysdk.adv.showFullscreenAdv({
             callbacks: {
                 onClose: (wasShown) => {
                     console.log('Interstitial Ad closed. Was shown:', wasShown);
-                    scene.sound.resumeAll(); // Возобновляем звуки
+                    analyticsManager.trackAdWatched('interstitial_gameover', wasShown ? 'success' : 'closed');
+                    scene.sound.resumeAll();
                     this.isAdOpen = false;
                 },
                 onError: (error) => {
                     console.error('Interstitial Ad error:', error);
+                    analyticsManager.trackAdWatched('interstitial_gameover', 'error');
                     scene.sound.resumeAll();
                     this.isAdOpen = false;
                 }
@@ -39,10 +42,10 @@ class AdManager {
     }
 
     // Показ рекламы за вознаграждение
-    showRewarded(scene, callbacks) {
+    showRewarded(scene, placement, callbacks) {
         if (!this.ysdk) {
             console.warn('Yandex SDK is not initialized.');
-            callbacks.onError?.(); // Вызываем колбэк ошибки, если он есть
+            callbacks.onError?.();
             return;
         }
 
@@ -52,23 +55,25 @@ class AdManager {
         this.ysdk.adv.showRewardedVideo({
             callbacks: {
                 onOpen: () => {
-                    console.log('Rewarded Ad opened.');
+                    console.log(`Rewarded Ad opened for placement: ${placement}`);
                 },
                 onRewarded: () => {
                     console.log('REWARDED!');
-                    callbacks.onRewarded?.(); // Вызываем колбэк "Награждено!"
+                    analyticsManager.trackAdWatched(placement, 'success');
+                    callbacks.onRewarded?.();
                 },
                 onClose: () => {
                     console.log('Rewarded Ad closed.');
                     scene.sound.resumeAll();
                     this.isAdOpen = false;
-                    callbacks.onClose?.(); // Вызываем колбэк закрытия
+                    callbacks.onClose?.();
                 },
                 onError: (error) => {
                     console.error('Rewarded Ad error:', error);
+                    analyticsManager.trackAdWatched(placement, 'error');
                     scene.sound.resumeAll();
                     this.isAdOpen = false;
-                    callbacks.onError?.(); // Вызываем колбэк ошибки
+                    callbacks.onError?.();
                 }
             }
         });
