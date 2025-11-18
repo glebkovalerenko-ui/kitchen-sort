@@ -1,6 +1,7 @@
 // /src/scenes/GameOverScene.js
 import Phaser from 'phaser';
 import { adManager } from '../AdManager.js';
+// DataManager здесь больше не нужен
 
 export default class GameOverScene extends Phaser.Scene {
     constructor() { super('GameOverScene'); }
@@ -18,17 +19,23 @@ export default class GameOverScene extends Phaser.Scene {
             adManager.showInterstitial(this);
         });
 
+        // --- ВОЗВРАЩАЕМ НАДЕЖНУЮ ЛОГИКУ КНОПКИ "RESTART" ---
         const restartBtn = this.add.image(this.game.config.width / 2, 500, 'button').setOrigin(0.5).setInteractive();
-        restartBtn.on('pointerdown', () => { this.scene.start('GameScene', { continueGame: false }); });
+        restartBtn.on('pointerdown', () => { 
+            this.sound.play('click_sfx');
+            // Просто перезагружаем страницу. Это самый чистый и надежный способ
+            // начать новую игровую сессию, не затрагивая мета-прогресс (монеты).
+            window.location.reload();
+        });
         this.add.text(restartBtn.x, restartBtn.y, 'Restart', { fontSize: '32px', fill: '#000'}).setOrigin(0.5);
 
+        // --- Кнопка "Continue" остается без изменений ---
         const continueBtn = this.add.image(this.game.config.width / 2, 650, 'button').setOrigin(0.5).setInteractive();
         const continueText = this.add.text(continueBtn.x, continueBtn.y, 'Continue (Ad)', { fontSize: '28px', fill: '#000'}).setOrigin(0.5);
-
         continueBtn.on('pointerdown', () => {
+            this.sound.play('click_sfx');
             adManager.showRewarded(this, {
                 onRewarded: () => {
-                    // ИЗМЕНЕНИЕ ЗДЕСЬ: Передаем обратно СЧЁТ
                     this.scene.start('GameScene', { 
                         continueGame: true, 
                         gridState: this.gridState, 

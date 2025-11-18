@@ -1,6 +1,6 @@
 // /src/DataManager.js
 
-import { GADGETS } from './gameConfig.js';
+import { GADGETS, GENERATORS } from './gameConfig.js';
 
 const SAVE_KEY = 'playerData'; // Ключ, под которым все данные будут храниться в облаке
 
@@ -15,6 +15,12 @@ class DataManager {
         this.player = player;
         console.log('DataManager initialized with Yandex Player object.');
         return this.load();
+    }
+
+    reset() {
+        console.log("Resetting player data to default.");
+        this.playerData = this.getDefaultData();
+        this.save();
     }
 
     // Метод загрузки данных из облака
@@ -103,7 +109,66 @@ class DataManager {
         return false;
     }
 
-    // Структура данных по умолчанию
+    getGeneratorState(generatorId) {
+        if (!this.playerData.generators[generatorId]) {
+            this.playerData.generators[generatorId] = {
+                charges: 4,
+                lastChargeTimestamp: Date.now(),
+                capacityLevel: 0,
+                speedLevel: 0,
+                bonusLevel: 0
+            };
+        }
+        return this.playerData.generators[generatorId];
+    }
+
+    useGeneratorCharge(generatorId) {
+        const state = this.getGeneratorState(generatorId);
+        if (state.charges > 0) {
+            state.charges--;
+            this.save();
+            return true;
+        }
+        return false;
+    }
+
+    setGeneratorState(generatorId, state) {
+        this.playerData.generators[generatorId] = state;
+    }
+
+    getGeneratorUpgradeLevel(generatorId, upgradeType) {
+        const state = this.getGeneratorState(generatorId);
+        return state[upgradeType + 'Level'];
+    }
+
+    getGeneratorUpgradeCost(generatorId, upgradeType) {
+        const config = GENERATORS[generatorId].upgrades[upgradeType];
+        const level = this.getGeneratorUpgradeLevel(generatorId, upgradeType);
+        return Math.floor(config.baseCost * Math.pow(config.factor, level));
+    }
+    
+    getCurrentGeneratorValue(generatorId, upgradeType) {
+        const config = GENERATORS[generatorId].upgrades[upgradeType];
+        const level = this.getGeneratorUpgradeLevel(generatorId, upgradeType);
+        if (upgradeType === 'speed') {
+            return config.baseValue - (config.decrement * level);
+        } else {
+            return config.baseValue + (config.increment * level);
+        }
+    }
+
+    upgradeGenerator(generatorId, upgradeType) {
+        const cost = this.getGeneratorUpgradeCost(generatorId, upgradeType);
+        if (this.getCoins() >= cost) {
+            this.removeCoins(cost);
+            const state = this.getGeneratorState(generatorId);
+            state[upgradeType + 'Level']++;
+            this.save();
+            return true;
+        }
+        return false;
+    }
+
     getDefaultData() {
         return {
             coins: 0,
@@ -111,7 +176,8 @@ class DataManager {
             gadgets: {
                 knifeLevel: 0,
                 spatulaLevel: 0
-            }
+            },
+            generators: {}
         };
     }
 }

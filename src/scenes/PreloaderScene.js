@@ -1,7 +1,8 @@
 // /src/scenes/PreloaderScene.js
 import Phaser from 'phaser';
 import { adManager } from '../AdManager.js';
-import { dataManager } from '../DataManager.js'; // Импортируем DataManager
+import { dataManager } from '../DataManager.js';
+import { TILE_TYPES } from '../gameConfig.js';
 
 export default class PreloaderScene extends Phaser.Scene {
     constructor() {
@@ -11,27 +12,54 @@ export default class PreloaderScene extends Phaser.Scene {
     preload() {
         console.log('Preloading assets...');
         
-        // Яичная цепочка
-        this.load.image('egg', 'assets/egg.png');
-        this.load.image('fried_egg', 'assets/fried_egg.png');
-        this.load.image('omelette', 'assets/omelette.png');
-        this.load.image('shakshuka', 'assets/shakshuka.png');
-        this.load.image('breakfast_platter', 'assets/breakfast_platter.png');
-
-        // Томатная цепочка
-        this.load.image('tomato', 'assets/tomato.png');
-        this.load.image('diced_tomatoes', 'assets/diced_tomatoes.png');
-        this.load.image('tomato_sauce', 'assets/tomato_sauce.png');
-        this.load.image('tomato_soup', 'assets/tomato_soup.png');
-        this.load.image('gazpacho', 'assets/gazpacho.png');
-
-        // Загружаем изображения UI
+        // --- Загрузка ассетов еды ---
+        for (const key in TILE_TYPES) {
+            const assetId = TILE_TYPES[key];
+            if (assetId !== 0) {
+                this.load.image(assetId, `assets/${assetId}.png`);
+            }
+        }
+        
+        // --- Загрузка UI и Эффектов ---
         this.load.image('button', 'assets/ui_button_default.png');
         this.load.image('particle', 'assets/particle.png');
 
-        // Загружаем звуки
+        // --- Загрузка Фонов ---
+        this.load.image('background_kitchen', 'assets/background_kitchen.png');
+        this.load.image('background_greenhouse', 'assets/background_greenhouse.png');
+        this.load.image('background_coop', 'assets/background_coop.png');
+
+        // --- Загрузка иконок Генераторов ---
+        this.load.image('icon_coop', 'assets/icon_coop.png');
+        this.load.image('icon_greenhouse', 'assets/icon_greenhouse.png');
+
+        // --- Загрузка спрайтов Куриц (с состояниями) ---
+        const chickenVariations = ['A', 'B', 'C'];
+        const chickenStates = ['resting', 'ready'];
+        for (const variation of chickenVariations) {
+            for (const state of chickenStates) {
+                const assetId = `chicken_${variation}_${state}`;
+                this.load.image(assetId, `assets/${assetId}.png`);
+            }
+        }
+        
+        // --- Загрузка спрайтов Кустов (с состояниями) ---
+        const plantVariations = ['A', 'B', 'C'];
+        const plantStates = ['growing', 'ready'];
+        for (const variation of plantVariations) {
+            for (const state of plantStates) {
+                const assetId = `tomato_plant_${variation}_${state}`;
+                this.load.image(assetId, `assets/${assetId}.png`);
+            }
+        }
+
+        // --- Загрузка Звуков ---
         this.load.audio('merge_sfx', 'assets/merge.mp3');
-        // TODO: Добавить сюда остальные звуки
+        this.load.audio('click_sfx', 'assets/click.mp3');
+        this.load.audio('swoosh_sfx', 'assets/swoosh.mp3');
+        this.load.audio('unlock_sfx', 'assets/unlock.mp3');
+        this.load.audio('gameover_sfx', 'assets/gameover.mp3');
+        this.load.audio('music', 'assets/music.mp3');
     }
 
     async create() {
@@ -39,24 +67,12 @@ export default class PreloaderScene extends Phaser.Scene {
         try {
             const ysdk = await YaGames.init();
             console.log('Yandex SDK is ready!');
-            
-            // Инициализируем AdManager
             adManager.init(ysdk);
-
-            // Получаем объект игрока для работы с сохранениями
             const player = await ysdk.getPlayer();
-            
-            // Инициализируем DataManager и ждем загрузки данных
             await dataManager.init(player);
-
-            // Теперь, когда все готово, запускаем игру
             this.startGame();
-
         } catch (err) {
             console.error('Yandex SDK or Player Data init error:', err);
-            // Даже если SDK не загрузился, мы можем запустить игру,
-            // но сохранения и реклама работать не будут.
-            // DataManager в этом случае будет работать с дефолтными данными.
             this.startGame();
         }
     }
