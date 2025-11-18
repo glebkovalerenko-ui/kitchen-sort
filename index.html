@@ -14,8 +14,8 @@
             const script = document.createElement('script');
             
             if (isLocal) {
-                // Если локально, подключаем нашу заглушку
-                script.src = '/src/YandexSDKMock.js';
+                // ИЗМЕНЕН ПУТЬ: Убрали /src, т.к. файл теперь будет в корне сборки
+                script.src = '/YandexSDKMock.js';
                 console.log('Loading Yandex SDK Mock for local development.');
             } else {
                 // Если на сервере, подключаем настоящий SDK
