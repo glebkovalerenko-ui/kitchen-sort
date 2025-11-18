@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import { adManager } from '../AdManager.js';
 import { dataManager } from '../DataManager.js';
 import { TILE_TYPES } from '../gameConfig.js';
+import { analyticsManager } from '../AnalyticsManager.js'; // ДОБАВЛЕНО
 
 export default class PreloaderScene extends Phaser.Scene {
     constructor() {
@@ -67,12 +68,19 @@ export default class PreloaderScene extends Phaser.Scene {
         try {
             const ysdk = await YaGames.init();
             console.log('Yandex SDK is ready!');
+            
+            // Инициализируем все глобальные менеджеры
             adManager.init(ysdk);
+            analyticsManager.init(ysdk); // ДОБАВЛЕНО
+            
             const player = await ysdk.getPlayer();
             await dataManager.init(player);
+            
             this.startGame();
         } catch (err) {
             console.error('Yandex SDK or Player Data init error:', err);
+            // В случае ошибки все равно запускаем игру, 
+            // так как менеджеры умеют работать в "пустом" режиме
             this.startGame();
         }
     }
