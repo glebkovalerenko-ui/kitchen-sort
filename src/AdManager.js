@@ -4,16 +4,14 @@ import { analyticsManager } from './AnalyticsManager.js';
 class AdManager {
     constructor() {
         this.ysdk = null;
-        this.isAdOpen = false; // Флаг, чтобы игра не ставилась на паузу дважды
+        this.isAdOpen = false;
     }
 
-    // Инициализация менеджера
     init(ysdk) {
         this.ysdk = ysdk;
         console.log('Yandex SDK initialized in AdManager!');
     }
 
-    // Показ полноэкранной рекламы
     showInterstitial(scene) {
         if (!this.ysdk) {
             console.warn('Yandex SDK is not initialized.');
@@ -22,6 +20,8 @@ class AdManager {
 
         this.isAdOpen = true;
         scene.sound.pauseAll();
+        // Приостанавливаем саму сцену, чтобы остановить update-цикл и таймеры
+        scene.scene.pause(); 
 
         this.ysdk.adv.showFullscreenAdv({
             callbacks: {
@@ -29,19 +29,20 @@ class AdManager {
                     console.log('Interstitial Ad closed. Was shown:', wasShown);
                     analyticsManager.trackAdWatched('interstitial_gameover', wasShown ? 'success' : 'closed');
                     scene.sound.resumeAll();
+                    scene.scene.resume(); // Возобновляем сцену
                     this.isAdOpen = false;
                 },
                 onError: (error) => {
                     console.error('Interstitial Ad error:', error);
                     analyticsManager.trackAdWatched('interstitial_gameover', 'error');
                     scene.sound.resumeAll();
+                    scene.scene.resume(); // Возобновляем сцену
                     this.isAdOpen = false;
                 }
             }
         });
     }
 
-    // Показ рекламы за вознаграждение
     showRewarded(scene, placement, callbacks) {
         if (!this.ysdk) {
             console.warn('Yandex SDK is not initialized.');
@@ -51,6 +52,7 @@ class AdManager {
 
         this.isAdOpen = true;
         scene.sound.pauseAll();
+        scene.scene.pause(); // Приостанавливаем сцену
 
         this.ysdk.adv.showRewardedVideo({
             callbacks: {
@@ -65,6 +67,7 @@ class AdManager {
                 onClose: () => {
                     console.log('Rewarded Ad closed.');
                     scene.sound.resumeAll();
+                    scene.scene.resume(); // Возобновляем сцену
                     this.isAdOpen = false;
                     callbacks.onClose?.();
                 },
@@ -72,6 +75,7 @@ class AdManager {
                     console.error('Rewarded Ad error:', error);
                     analyticsManager.trackAdWatched(placement, 'error');
                     scene.sound.resumeAll();
+                    scene.scene.resume(); // Возобновляем сцену
                     this.isAdOpen = false;
                     callbacks.onError?.();
                 }
@@ -80,5 +84,4 @@ class AdManager {
     }
 }
 
-// Создаем один-единственный экземпляр, как и с DataManager
 export const adManager = new AdManager();
