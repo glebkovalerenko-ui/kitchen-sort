@@ -31,23 +31,13 @@ export default class CollectionScene extends Phaser.Scene {
         });
 
         const backBtn = this.add.image(this.game.config.width / 2, this.game.config.height - 100, 'button')
-            .setOrigin(0.5) // Правильный порядок
+            .setOrigin(0.5)
             .setInteractive()
             .on('pointerdown', () => {
+                this.sound.play('click'); // ИЗМЕНЕНО
                 this.scene.resume('GameScene');
                 this.scene.stop();
             });
         this.add.text(backBtn.x, backBtn.y, 'Back', { fontSize: '32px', fill: '#000'}).setOrigin(0.5);
-
-        // --- ВЫЗЫВАЕМ НАШ ОТЛАДЧИК ---
-        this.drawDebugHitbox(backBtn);
-    }
-
-    // --- ДОБАВЛЯЕМ МЕТОД ОТЛАДЧИКА ---
-    drawDebugHitbox(gameObject) {
-        const hitbox = gameObject.getBounds();
-        const graphics = this.add.graphics();
-        graphics.lineStyle(2, 0xff0000, 0.7);
-        graphics.strokeRectShape(hitbox);
     }
 }

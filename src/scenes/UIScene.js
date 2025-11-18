@@ -1,6 +1,8 @@
 // /src/scenes/UIScene.js
 import Phaser from 'phaser';
 import { dataManager } from '../DataManager.js';
+import { adManager } from '../AdManager.js';
+import { CLEAR_BOARD_COST } from '../gameConfig.js';
 
 export default class UIScene extends Phaser.Scene {
     constructor() {
@@ -8,50 +10,111 @@ export default class UIScene extends Phaser.Scene {
     }
 
     create() {
-        // Получаем ссылку на GameScene в самом начале
         const gameScene = this.scene.get('GameScene');
 
-        // --- Элементы счёта (ИСПРАВЛЕНО) ---
-        // ИЗМЕНЕНИЕ: При создании текста, сразу берем актуальный score из GameScene
         this.scoreText = this.add.text(50, 50, 'Score: ' + gameScene.score, { fontSize: '32px', fill: '#ffffff' });
-        // Слушатель событий остается для будущих обновлений
         gameScene.events.on('updateScore', (score) => { this.scoreText.setText('Score: ' + score); }, this);
 
-        // С монетами уже все было правильно, так как они берутся из dataManager
         this.coinsText = this.add.text(50, 90, 'Coins: ' + dataManager.getCoins(), { fontSize: '32px', fill: '#ffffff' });
         gameScene.events.on('updateCoins', (coins) => { this.coinsText.setText('Coins: ' + coins); }, this);
         
-        // --- Кнопка "Книга Рецептов" ---
         const collectionBtn = this.add.image(this.game.config.width - 150, 70, 'button')
             .setOrigin(0.5)
             .setInteractive()
             .on('pointerdown', () => {
+                this.sound.play('click'); // ИЗМЕНЕНО
                 this.scene.pause('GameScene');
                 this.scene.launch('CollectionScene');
             });
         this.add.text(collectionBtn.x, collectionBtn.y, 'Book', { fontSize: '28px', fill: '#000'}).setOrigin(0.5);
 
-        // --- Кнопка "Магазин Гаджетов" ---
-        const newX = collectionBtn.x - 240 - 20; 
-
-        const upgradeBtn = this.add.image(newX, 70, 'button')
+        const upgradeBtn = this.add.image(collectionBtn.x - 220, 70, 'button')
             .setOrigin(0.5)
             .setInteractive()
             .on('pointerdown', () => {
+                this.sound.play('click'); // ИЗМЕНЕНО
                 this.scene.pause('GameScene');
                 this.scene.launch('UpgradeScene');
             });
         this.add.text(upgradeBtn.x, upgradeBtn.y, 'Shop', { fontSize: '28px', fill: '#000'}).setOrigin(0.5);
         
-        // Отладчик можно убрать, если он больше не нужен
-        // this.drawDebugHitbox(collectionBtn);
-        // this.drawDebugHitbox(upgradeBtn);
+        const clearBtn = this.add.image(this.game.config.width / 2, this.game.config.height - 70, 'button')
+            .setOrigin(0.5)
+            .setInteractive()
+            .on('pointerdown', () => {
+                this.sound.play('click'); // ИЗМЕНЕНО
+                this.showClearBoardPanel();
+            });
+        this.add.text(clearBtn.x, clearBtn.y, 'Очистить', { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+
+        this.clearBoardPanel = null;
     }
     
-    // drawDebugHitbox(gameObject) {
-    //     const hitbox = gameObject.getBounds();
-    //     const graphics = this.add.graphics();
-    //     graphics.lineStyle(2, 0xff0000, 0.7);
-    //     graphics.strokeRectShape(hitbox);
-    // }
+    showClearBoardPanel() {
+        if (this.clearBoardPanel) return;
+
+        const gameScene = this.scene.get('GameScene');
+        this.clearBoardPanel = this.add.container(this.game.config.width / 2, this.game.config.height / 2);
+        this.clearBoardPanel.setDepth(10);
+
+        const overlay = this.add.rectangle(0, 0, this.game.config.width, this.game.config.height, 0x000000, 0.7);
+        overlay.setInteractive();
+        this.clearBoardPanel.add(overlay);
+
+        const panelBG = this.add.graphics();
+        panelBG.fillStyle(0x333333, 1);
+        panelBG.lineStyle(2, 0xffffff, 1);
+        panelBG.fillRoundedRect(-250, -150, 500, 300, 16);
+        this.clearBoardPanel.add(panelBG);
+        
+        this.clearBoardPanel.add(this.add.text(0, -100, 'Очистить поле?', { fontSize: '32px', fill: '#fff' }).setOrigin(0.5));
+        
+        const payBtn = this.add.image(0, 0, 'button').setScale(1.2).setInteractive();
+        const payBtnText = this.add.text(payBtn.x, payBtn.y, `${CLEAR_BOARD_COST}`, { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+        this.clearBoardPanel.add([payBtn, payBtnText]);
+
+        if (dataManager.getCoins() < CLEAR_BOARD_COST) {
+            payBtn.setTint(0x888888).disableInteractive();
+        } else {
+            payBtn.on('pointerdown', () => {
+                this.sound.play('click'); // ИЗМЕНЕНО
+                if (dataManager.removeCoins(CLEAR_BOARD_COST)) {
+                    dataManager.save(true);
+                    this.events.emit('updateCoins', dataManager.getCoins());
+                    gameScene.clearBoard();
+                    this.hideClearBoardPanel();
+                }
+            });
+        }
+        
+        const adBtn = this.add.image(0, 100, 'button').setScale(1.2).setInteractive();
+        const adBtnText = this.add.text(adBtn.x, adBtn.y, 'Бесплатно (Ad)', { fontSize: '28px', fill: '#000' }).setOrigin(0.5);
+        this.clearBoardPanel.add([adBtn, adBtnText]);
+        
+        adBtn.on('pointerdown', () => {
+            this.sound.play('click'); // ИЗМЕНЕНО
+            adManager.showRewarded(gameScene, 'rewarded_clear_field', {
+                onRewarded: () => {
+                    gameScene.clearBoard();
+                    this.hideClearBoardPanel();
+                },
+                onError: () => {
+                    adBtnText.setText('Ошибка');
+                    adBtn.disableInteractive().setTint(0x888888);
+                }
+            });
+        });
+
+        const closeBtn = this.add.text(230, -135, 'X', { fontSize: '32px', fill: '#ff0000' }).setOrigin(0.5).setInteractive();
+        closeBtn.on('pointerdown', this.hideClearBoardPanel, this);
+        this.clearBoardPanel.add(closeBtn);
+    }
+    
+    hideClearBoardPanel() {
+        if (this.clearBoardPanel) {
+            this.sound.play('click'); // ИЗМЕНЕНО
+            this.clearBoardPanel.destroy();
+            this.clearBoardPanel = null;
+        }
+    }
 }

@@ -23,7 +23,7 @@ export default class UpgradeScene extends Phaser.Scene {
             .setOrigin(0.5)
             .setInteractive()
             .on('pointerdown', () => {
-                this.sound.play('click_sfx');
+                this.sound.play('click'); // ИЗМЕНЕНО
                 this.scene.resume('GameScene');
                 this.scene.stop();
             });
@@ -44,11 +44,10 @@ export default class UpgradeScene extends Phaser.Scene {
         const buyBtnText = this.add.text(buyBtn.x, buyBtn.y, `Buy: ${cost}`, { fontSize: '28px', fill: '#000'}).setOrigin(0.5);
         
         buyBtn.on('pointerdown', () => {
-            this.sound.play('click_sfx');
+            this.sound.play('click'); // ИЗМЕНЕНО
             if (dataManager.upgradeGadget(gadgetId)) {
-                this.scene.restart(); // Перезапускаем сцену, чтобы обновить все данные
+                this.scene.restart();
             } else {
-                // НОВЫЙ БЛОК: UI-фидбек при нехватке монет
                 this.tweens.add({
                     targets: buyBtn,
                     x: buyBtn.x + 10,

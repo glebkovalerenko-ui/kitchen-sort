@@ -13,8 +13,18 @@ class DataManager {
         this.saveTimeout = null;
         this.isDataDirty = false;
         this.SAVE_DELAY = 2000;
+
+        // НОВЫЕ СВОЙСТВА: Отслеживание монет за сессию
+        this.sessionStartCoins = 0;
+        this.coinsEarnedThisSession = 0;
     }
     
+    // НОВЫЙ МЕТОД: Вызывается в начале каждой игровой сессии
+    startSessionTracking() {
+        this.sessionStartCoins = this.getCoins();
+        this.coinsEarnedThisSession = 0;
+    }
+
     async init(player) {
         this.player = player;
         console.log('DataManager initialized with Yandex Player object.');
@@ -96,6 +106,7 @@ class DataManager {
     
     addCoins(amount) {
         this.playerData.coins += amount;
+        this.coinsEarnedThisSession += amount; // Обновляем счетчик сессии
         this.markDirty();
     }
 
@@ -106,6 +117,10 @@ class DataManager {
             return true;
         }
         return false;
+    }
+    
+    getCoinsEarnedThisSession() {
+        return this.coinsEarnedThisSession;
     }
 
     getGadgetLevel(gadgetId) {
@@ -126,7 +141,7 @@ class DataManager {
         if (this.removeCoins(cost)) {
             const newLevel = this.playerData.gadgets[gadgetId + 'Level'] + 1;
             this.playerData.gadgets[gadgetId + 'Level'] = newLevel;
-            analyticsManager.trackGadgetUpgraded(gadgetId, newLevel); // ДОБАВЛЕНО
+            analyticsManager.trackGadgetUpgraded(gadgetId, newLevel);
             this.save(true);
             return true;
         }
@@ -189,7 +204,7 @@ class DataManager {
             const state = this.getGeneratorState(generatorId);
             const newLevel = state[upgradeType + 'Level'] + 1;
             state[upgradeType + 'Level'] = newLevel;
-            analyticsManager.trackGeneratorUpgraded(generatorId, upgradeType, newLevel); // ДОБАВЛЕНО
+            analyticsManager.trackGeneratorUpgraded(generatorId, upgradeType, newLevel);
             this.save(true);
             return true;
         }

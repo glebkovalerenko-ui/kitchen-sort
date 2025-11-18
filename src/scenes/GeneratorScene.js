@@ -27,7 +27,7 @@ export default class GeneratorScene extends Phaser.Scene {
         }
 
         this.createUI();
-        this.refreshAllDisplays(); // Единый метод для обновления всего
+        this.refreshAllDisplays();
     }
     
     update(time, delta) {
@@ -60,7 +60,7 @@ export default class GeneratorScene extends Phaser.Scene {
         const backBtn = this.add.image(80, 60, 'button').setScale(0.7).setInteractive();
         this.add.text(backBtn.x, backBtn.y, 'Назад', { fontSize: '24px', fill: '#000' }).setOrigin(0.5);
         backBtn.on('pointerdown', () => {
-            this.sound.play('click_sfx');
+            this.sound.play('click'); // ИЗМЕНЕНО
             this.scene.resume('GameScene');
             this.scene.stop();
         });
@@ -77,13 +77,13 @@ export default class GeneratorScene extends Phaser.Scene {
         const upgradeBtn = this.add.image(this.game.config.width - 150, uiPanelY + 15, 'button').setScale(1.2).setInteractive();
         this.add.text(upgradeBtn.x, upgradeBtn.y, 'Улучшить', { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
         upgradeBtn.on('pointerdown', () => {
-             this.sound.play('click_sfx');
+             this.sound.play('click'); // ИЗМЕНЕНО
              this.showUpgradePanel();
         });
     }
 
     onCollectClicked() {
-        this.sound.play('click_sfx');
+        this.sound.play('click'); // ИЗМЕНЕНО
         const state = dataManager.getGeneratorState(this.generatorId);
         const chargesToCollect = state.charges;
 
@@ -132,19 +132,18 @@ export default class GeneratorScene extends Phaser.Scene {
             this.createUpgradeRow(type, yPos);
         });
         
-        // --- НОВАЯ КНОПКА "БУСТ ЗА РЕКЛАМУ" ---
         const boostBtn = this.add.image(0, 180, 'button').setScale(1.2).setInteractive();
         const boostBtnText = this.add.text(boostBtn.x, boostBtn.y, 'Бонус (Ad)', { fontSize: '28px', fill: '#000' }).setOrigin(0.5);
         this.upgradePanel.add([boostBtn, boostBtnText]);
         boostBtn.on('pointerdown', () => {
-            this.sound.play('click_sfx');
+            this.sound.play('click'); // ИЗМЕНЕНО
             adManager.showRewarded(this, 'rewarded_generator_boost', {
                 onRewarded: () => {
                     const state = dataManager.getGeneratorState(this.generatorId);
                     const capacity = dataManager.getCurrentGeneratorValue(this.generatorId, 'capacity');
-                    state.charges = Math.min(capacity, state.charges + 1); // Даем 1 бесплатный заряд
+                    state.charges = Math.min(capacity, state.charges + 1);
                     dataManager.setGeneratorState(this.generatorId, state);
-                    dataManager.save(true); // Сохраняем награду немедленно
+                    dataManager.save(true);
                     this.refreshAllDisplays();
                 },
                 onError: () => {
@@ -158,7 +157,7 @@ export default class GeneratorScene extends Phaser.Scene {
     }
 
     hideUpgradePanel() {
-        this.sound.play('click_sfx');
+        this.sound.play('click'); // ИЗМЕНЕНО
         if (this.upgradePanel) {
             this.upgradePanel.destroy();
             this.upgradePanel = null;
@@ -175,12 +174,11 @@ export default class GeneratorScene extends Phaser.Scene {
         };
         
         row.button.on('pointerdown', () => {
-            this.sound.play('click_sfx');
+            this.sound.play('click'); // ИЗМЕНЕНО
             const success = dataManager.upgradeGenerator(this.generatorId, type);
             if (success) {
                 this.refreshAllDisplays();
             } else {
-                // UI-фидбек при нехватке монет
                 this.tweens.add({
                     targets: row.button,
                     x: row.button.x + 10,
@@ -197,7 +195,6 @@ export default class GeneratorScene extends Phaser.Scene {
     }
 
     refreshAllDisplays() {
-        // --- Обновление основного UI ---
         const state = dataManager.getGeneratorState(this.generatorId);
         const capacity = dataManager.getCurrentGeneratorValue(this.generatorId, 'capacity');
         this.chargesText.setText(`Готово: ${state.charges} / ${capacity}`);
@@ -226,7 +223,6 @@ export default class GeneratorScene extends Phaser.Scene {
             }
         }
 
-        // --- Обновление панели улучшений, если она открыта ---
         if (this.upgradePanel && this.upgradePanel.active) {
             for (const type in this.upgradeRows) {
                 const row = this.upgradeRows[type];

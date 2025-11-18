@@ -16,7 +16,6 @@ export default class GameScene extends Phaser.Scene {
         this.shouldContinue = data.continueGame || false;
         this.savedGridState = data.gridState || null;
         this.initialScore = data.score || 0;
-        this.initialCoins = dataManager.getCoins(); // Сохраняем начальное кол-во монет
         this.events.on('resume', this.onSceneResume, this);
     }
 
@@ -30,7 +29,8 @@ export default class GameScene extends Phaser.Scene {
         this.score = this.initialScore;
         this.ingredientsGroup = this.add.group();
         
-        this.sessionStartTime = Date.now(); // ДОБАВЛЕНО: Засекаем время начала сессии
+        this.sessionStartTime = Date.now();
+        dataManager.startSessionTracking();
         
         this.gridManager = new GridManager(this);
         this.mergeSystem = new MergeSystem();
@@ -74,7 +74,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     handleMerge(draggedObject, targetObject, recipe) {
-        this.sound.play('merge_sfx');
+        this.sound.play('merge'); // ИЗМЕНЕНО: 'merge_sfx' -> 'merge'
         
         const sourceGridPos = { x: draggedObject.getData('gridX'), y: draggedObject.getData('gridY') };
         const targetGridPos = { x: targetObject.getData('gridX'), y: targetObject.getData('gridY') };
@@ -91,7 +91,7 @@ export default class GameScene extends Phaser.Scene {
         this.events.emit('updateCoins', dataManager.getCoins());
         const isNewUnlock = dataManager.unlockIngredient(recipe.output);
         if (isNewUnlock) {
-            this.sound.play('unlock_sfx');
+            this.sound.play('unlock'); // ИЗМЕНЕНО: 'unlock_sfx' -> 'unlock'
             console.log('NEW UNLOCK:', recipe.output);
         }
 
@@ -147,7 +147,7 @@ export default class GameScene extends Phaser.Scene {
         const coopIcon = this.add.image(this.GRID_START_X - 80, this.GRID_START_Y + 70, 'icon_coop').setScale(0.15).setInteractive();
         const coopChargesText = this.add.text(coopIcon.x, coopIcon.y + 80, '', iconStyle).setOrigin(0.5);
         coopIcon.on('pointerdown', () => {
-            this.sound.play('click_sfx');
+            this.sound.play('click'); // ИЗМЕНЕНО: 'click_sfx' -> 'click'
             this.scene.pause();
             this.scene.launch('GeneratorScene', { id: 'coop' });
         });
@@ -155,7 +155,7 @@ export default class GameScene extends Phaser.Scene {
         const greenhouseIcon = this.add.image(this.GRID_START_X + this.GRID_COLS * this.CELL_SIZE + 80, this.GRID_START_Y + 70, 'icon_greenhouse').setScale(0.15).setInteractive();
         const greenhouseChargesText = this.add.text(greenhouseIcon.x, greenhouseIcon.y + 80, '', iconStyle).setOrigin(0.5);
         greenhouseIcon.on('pointerdown', () => {
-            this.sound.play('click_sfx');
+            this.sound.play('click'); // ИЗМЕНЕНО: 'click_sfx' -> 'click'
             this.scene.pause();
             this.scene.launch('GeneratorScene', { id: 'greenhouse' });
         });
@@ -194,11 +194,9 @@ export default class GameScene extends Phaser.Scene {
 
     triggerGameOver() {
         console.log("GAME OVER! No more moves.");
-        this.sound.play('gameover_sfx');
-        
-        // --- ДОБАВЛЕНА ЛОГИКА ПЕРЕДАЧИ ДАННЫХ ДЛЯ АНАЛИТИКИ ---
+        // Звук проигрыша убран, т.к. его нет в новом саунд-плане.
         const sessionDuration = Math.round((Date.now() - this.sessionStartTime) / 1000);
-        const coinsEarned = dataManager.getCoins() - this.initialCoins;
+        const coinsEarned = dataManager.getCoinsEarnedThisSession();
         
         const currentGridState = this.saveGridState();
         this.scene.stop('UIScene');
@@ -335,7 +333,7 @@ export default class GameScene extends Phaser.Scene {
     }
     
     clearBoard() {
-        this.sound.play('swoosh_sfx');
+        this.sound.play('swoosh'); // ИСПОЛЬЗУЕМ ЗВУК ПЕРЕТАСКИВАНИЯ ДЛЯ ЭФФЕКТА "СМАХИВАНИЯ"
         
         const items = this.ingredientsGroup.getChildren();
         

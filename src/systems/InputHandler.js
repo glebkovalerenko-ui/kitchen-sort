@@ -10,7 +10,7 @@ export default class InputHandler {
     }
 
     onDragStart(pointer, gameObject) {
-        this.scene.sound.play('swoosh_sfx', { volume: 0.7 });
+        this.scene.sound.play('swoosh', { volume: 0.7 }); // ИЗМЕНЕНО: 'swoosh_sfx' -> 'swoosh'
         this.scene.children.bringToTop(gameObject);
         gameObject.setScale(gameObject.getData('baseScale') * 1.1);
     }
@@ -26,7 +26,6 @@ export default class InputHandler {
         const gridX = Math.floor((pointer.x - this.scene.GRID_START_X) / this.scene.CELL_SIZE);
         const gridY = Math.floor((pointer.y - this.scene.GRID_START_Y) / this.scene.CELL_SIZE);
         
-        // Просто сообщаем главной сцене, что произошло событие
         this.scene.handleDrop(gameObject, gridX, gridY);
     }
 }

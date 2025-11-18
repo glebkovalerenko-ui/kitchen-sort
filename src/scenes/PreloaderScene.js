@@ -3,7 +3,7 @@ import Phaser from 'phaser';
 import { adManager } from '../AdManager.js';
 import { dataManager } from '../DataManager.js';
 import { TILE_TYPES } from '../gameConfig.js';
-import { analyticsManager } from '../AnalyticsManager.js'; // ДОБАВЛЕНО
+import { analyticsManager } from '../AnalyticsManager.js';
 
 export default class PreloaderScene extends Phaser.Scene {
     constructor() {
@@ -54,13 +54,13 @@ export default class PreloaderScene extends Phaser.Scene {
             }
         }
 
-        // --- Загрузка Звуков ---
-        this.load.audio('merge_sfx', 'assets/merge.mp3');
-        this.load.audio('click_sfx', 'assets/click.mp3');
-        this.load.audio('swoosh_sfx', 'assets/swoosh.mp3');
-        this.load.audio('unlock_sfx', 'assets/unlock.mp3');
-        this.load.audio('gameover_sfx', 'assets/gameover.mp3');
-        this.load.audio('music', 'assets/music.mp3');
+        // --- НОВАЯ ЗАГРУЗКА ЗВУКОВ ---
+        // Мы используем короткие, понятные ключи для вызова в коде
+        this.load.audio('merge', 'assets/sfx_merge_pop_01.mp3');
+        this.load.audio('click', 'assets/sfx_ui_click_positive_01.mp3');
+        this.load.audio('swoosh', 'assets/sfx_item_drag_swoosh_01.mp3');
+        this.load.audio('unlock', 'assets/sfx_unlock_chime_01.mp3');
+        this.load.audio('music', 'assets/music_background_loop_cozy.mp3');
     }
 
     async create() {
@@ -69,9 +69,8 @@ export default class PreloaderScene extends Phaser.Scene {
             const ysdk = await YaGames.init();
             console.log('Yandex SDK is ready!');
             
-            // Инициализируем все глобальные менеджеры
             adManager.init(ysdk);
-            analyticsManager.init(ysdk); // ДОБАВЛЕНО
+            analyticsManager.init(ysdk);
             
             const player = await ysdk.getPlayer();
             await dataManager.init(player);
@@ -79,8 +78,6 @@ export default class PreloaderScene extends Phaser.Scene {
             this.startGame();
         } catch (err) {
             console.error('Yandex SDK or Player Data init error:', err);
-            // В случае ошибки все равно запускаем игру, 
-            // так как менеджеры умеют работать в "пустом" режиме
             this.startGame();
         }
     }

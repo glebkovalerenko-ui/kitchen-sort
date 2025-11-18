@@ -40,8 +40,8 @@ const advMock = {
         console.log('[MOCK SDK] Adv.showFullscreenAdv called.');
         setTimeout(() => {
             console.log('[MOCK SDK] Interstitial Ad "closed".');
-            callbacks.callbacks.onClose(true); // true = реклама была показана
-        }, 500); // Имитируем небольшую задержку
+            callbacks.callbacks.onClose(true);
+        }, 500);
     },
 
     showRewardedVideo: function(callbacks) {
@@ -50,17 +50,37 @@ const advMock = {
             console.log('[MOCK SDK] Rewarded Ad "watched" and "closed".');
             callbacks.callbacks.onRewarded();
             callbacks.callbacks.onClose();
-        }, 1000); // Имитируем задержку просмотра
+        }, 1000);
     }
 };
 
-// --- НОВАЯ ИМИТАЦИЯ АНАЛИТИКИ (Metrica) ---
+// --- Имитация аналитики (Metrica) ---
 const metricaMock = {
     reachGoal: function(eventName, eventParams) {
         console.log(`[MOCK SDK] Metrica.reachGoal called. Event: ${eventName}`, eventParams || '');
     }
 };
 
+// --- УЛУЧШЕННАЯ ИМИТАЦИЯ ЛИДЕРБОРДОВ ---
+const leaderboardMock = {
+    setLeaderboardScore: function(leaderboardName, score) {
+        console.log(`[MOCK SDK] Leaderboard.setLeaderboardScore called. Board: '${leaderboardName}', Score: ${score}`);
+        return Promise.resolve();
+    },
+    getLeaderboardPlayerEntry: function(leaderboardName) {
+        console.log(`[MOCK SDK] Leaderboard.getLeaderboardPlayerEntry called for '${leaderboardName}'.`);
+        return Promise.resolve({
+            getScore: () => 12345,
+            getRank: () => 10
+        });
+    },
+    // ДОБАВЛЕН МЕТОД ДЛЯ ОТКРЫТИЯ UI
+    openLeaderboard: function(leaderboardName) {
+        console.log(`[MOCK SDK] Leaderboard.openLeaderboard called for board: '${leaderboardName}'.`);
+        alert(`[MOCK] Открыта таблица лидеров: '${leaderboardName}'`); // Показываем alert для наглядности
+        return Promise.resolve();
+    }
+};
 
 // --- Создаем глобальный объект YaGames ---
 window.YaGames = {
@@ -68,10 +88,15 @@ window.YaGames = {
         console.log('[MOCK SDK] YaGames.init called.');
         return Promise.resolve({
             adv: advMock,
-            metrica: metricaMock, // ДОБАВЛЕНО
+            metrica: metricaMock,
+            features: { Leaderboards: { isFeatureAvailable: true } }, // Говорим, что фича всегда доступна локально
             getPlayer: () => {
                 console.log('[MOCK SDK] ysdk.getPlayer called.');
                 return localStorageMock.init();
+            },
+            getLeaderboards: () => {
+                console.log('[MOCK SDK] ysdk.getLeaderboards called.');
+                return Promise.resolve(leaderboardMock);
             }
         });
     }
