@@ -8,17 +8,23 @@
     <!-- Этот блок будет динамически подключать нужный скрипт -->
     <script>
         (function() {
-            // Проверяем, запущена ли игра локально
-            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            // УЛУЧШЕННАЯ ПРОВЕРКА: Считаем локальной средой localhost, 127.0.0.1,
+            // а также любые IP-адреса, начинающиеся с '192.168.' или '10.'
+            const hostname = window.location.hostname;
+            const isLocal = (
+                hostname === 'localhost' ||
+                hostname === '127.0.0.1' ||
+                hostname.startsWith('192.168.')
+            );
             
             const script = document.createElement('script');
             
             if (isLocal) {
-                // ИЗМЕНЕН ПУТЬ: Убрали /src, т.к. файл теперь будет в корне сборки
+                // Если локально, подключаем нашу заглушку
                 script.src = '/YandexSDKMock.js';
-                console.log('Loading Yandex SDK Mock for local development.');
+                console.log('LOADING LOCAL YANDEX SDK MOCK. Hostname:', hostname);
             } else {
-                // Если на сервере, подключаем настоящий SDK
+                // Если на сервере (на Яндексе), подключаем настоящий SDK
                 script.src = 'https://yandex.ru/games/sdk/v2';
                 console.log('Loading official Yandex SDK.');
             }
