@@ -10,7 +10,7 @@ export default class CollectionScene extends Phaser.Scene {
 
     create() {
         this.add.rectangle(0, 0, this.game.config.width, this.game.config.height, 0x000000, 0.7).setOrigin(0);
-        this.add.text(this.game.config.width / 2, 100, 'Recipe Book', { fontSize: '48px', fill: '#ffffff' }).setOrigin(0.5);
+        this.add.text(this.game.config.width / 2, 100, 'Книга Рецептов', { fontSize: '48px', fill: '#ffffff' }).setOrigin(0.5);
 
         const allItems = Object.values(TILE_TYPES).filter(type => type !== 0);
         const cols = 5;
@@ -30,14 +30,12 @@ export default class CollectionScene extends Phaser.Scene {
             }
         });
 
-        const backBtn = this.add.image(this.game.config.width / 2, this.game.config.height - 100, 'button')
-            .setOrigin(0.5)
-            .setInteractive()
-            .on('pointerdown', () => {
-                this.sound.play('click'); // ИЗМЕНЕНО
-                this.scene.resume('GameScene');
-                this.scene.stop();
-            });
-        this.add.text(backBtn.x, backBtn.y, 'Back', { fontSize: '32px', fill: '#000'}).setOrigin(0.5);
+        const backBtn = this.add.image(this.game.config.width / 2, this.game.config.height - 100, 'button').setOrigin(0.5).setInteractive();
+        this.add.text(backBtn.x, backBtn.y, 'Назад', { fontSize: '32px', fill: '#000'}).setOrigin(0.5);
+        backBtn.on('pointerdown', () => {
+            this.sound.play('click');
+            this.scene.resume('GameScene');
+            this.scene.stop();
+        });
     }
 }

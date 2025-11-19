@@ -62,9 +62,9 @@ export const GENERATORS = {
         name: 'Курятник',
         produces: TILE_TYPES.EGG,
         upgrades: {
-            capacity: { name: 'Новое гнездо', baseCost: 50, factor: 1.8, baseValue: 4, increment: 1 }, // Вместимость
-            speed: { name: 'Улучшенный корм', baseCost: 100, factor: 1.5, baseValue: 600, decrement: 30 }, // Время перезарядки в сек.
-            bonus: { name: 'Породистые куры', baseCost: 500, factor: 2.5, baseValue: 0, increment: 0.02 } // Шанс бонуса (0.02 = 2%)
+            capacity: { name: 'Новое гнездо', baseCost: 50, factor: 1.8, baseValue: 4, increment: 1 },
+            speed: { name: 'Улучшенный корм', baseCost: 100, factor: 1.5, baseValue: 600, decrement: 30 },
+            bonus: { name: 'Породистые куры', baseCost: 500, factor: 2.5, baseValue: 0, increment: 0.02 }
         }
     },
     'greenhouse': {
@@ -80,36 +80,20 @@ export const GENERATORS = {
 };
 
 export const GADGETS = {
-    'knife': { id: 'knife', name: 'Better Knife', description: 'Increases coins per merge by 10% per level.', baseCost: 100, costFactor: 1.5 },
-    'spatula': { id: 'spatula', name: 'Golden Spatula', description: 'Increases score per merge by 10% per level.', baseCost: 250, costFactor: 1.8 }
+    // ТЕКСТ ПЕРЕВЕДЕН НА РУССКИЙ
+    'knife': { id: 'knife', name: 'Острый Нож', description: 'Увеличивает монеты за слияние на 10% за уровень.', baseCost: 100, costFactor: 1.5 },
+    'spatula': { id: 'spatula', name: 'Золотая Лопатка', description: 'Увеличивает очки за слияние на 10% за уровень.', baseCost: 250, costFactor: 1.8 }
 };
 
 export const GREENHOUSE_SLOTS = [
-    // Задняя грядка
-    { "x": 171, "y": 467, "scale": 0.5 },
-    { "x": 396, "y": 467, "scale": 0.5 },
-    { "x": 620, "y": 467, "scale": 0.5 },
-    
-    // Передняя грядка
-    { "x": 117, "y": 581, "scale": 0.5 },
-    { "x": 305, "y": 581, "scale": 0.5 },
-    { "x": 494, "y": 581, "scale": 0.5 },
-    { "x": 683, "y": 581, "scale": 0.5 }
+    { "x": 171, "y": 467, "scale": 0.5 }, { "x": 396, "y": 467, "scale": 0.5 }, { "x": 620, "y": 467, "scale": 0.5 },
+    { "x": 117, "y": 581, "scale": 0.5 }, { "x": 305, "y": 581, "scale": 0.5 }, { "x": 494, "y": 581, "scale": 0.5 }, { "x": 683, "y": 581, "scale": 0.5 }
 ];
 
 export const COOP_SLOTS = [
-    // Задняя полка
-    { "x": 306, "y": 291, "scale": 0.35 },
-    { "x": 485, "y": 291, "scale": 0.35 },
-    
-    // Передняя полка
-    { "x": 306, "y": 502, "scale": 0.35 },
-    { "x": 485, "y": 502, "scale": 0.35 },
-    
-    // Пол
-    { "x": 190, "y": 720, "scale": 0.5 },
-    { "x": 402, "y": 760, "scale": 0.5 },
-    { "x": 615, "y": 720, "scale": 0.5 }
+    { "x": 306, "y": 291, "scale": 0.35 }, { "x": 485, "y": 291, "scale": 0.35 },
+    { "x": 306, "y": 502, "scale": 0.35 }, { "x": 485, "y": 502, "scale": 0.35 },
+    { "x": 190, "y": 720, "scale": 0.5 }, { "x": 402, "y": 760, "scale": 0.5 }, { "x": 615, "y": 720, "scale": 0.5 }
 ];
 
-export const CLEAR_BOARD_COST = 250; // Конфигурация стоимости "Очистить поле"
+export const CLEAR_BOARD_COST = 250;

@@ -56,28 +56,34 @@ export default class GeneratorScene extends Phaser.Scene {
     }
     
     createUI() {
+        const textStyle = { fontSize: '28px', fill: '#ffffff', stroke: '#000000', strokeThickness: 5 };
+
+        // --- ВЕРХНЯЯ ПАНЕЛЬ ---
         this.add.text(this.game.config.width / 2, 60, this.config.name, { fontSize: '48px', fill: '#ffffff', stroke: '#333333', strokeThickness: 6 }).setOrigin(0.5);
         const backBtn = this.add.image(80, 60, 'button').setScale(0.7).setInteractive();
         this.add.text(backBtn.x, backBtn.y, 'Назад', { fontSize: '24px', fill: '#000' }).setOrigin(0.5);
         backBtn.on('pointerdown', () => {
-            this.sound.play('click'); // ИЗМЕНЕНО
+            this.sound.play('click');
             this.scene.resume('GameScene');
             this.scene.stop();
         });
 
-        const uiPanelY = this.game.config.height - 100;
-        const textStyle = { fontSize: '24px', fill: '#ffffff', stroke: '#000', strokeThickness: 4 };
-        this.timerText = this.add.text(40, uiPanelY, '', textStyle).setOrigin(0, 0.5);
-        this.chargesText = this.add.text(40, uiPanelY + 30, '', textStyle).setOrigin(0, 0.5);
+        // ИНФОРМАЦИЯ ПЕРЕМЕЩЕНА НАВЕРХ
+        this.chargesText = this.add.text(this.game.config.width / 2, 120, '', textStyle).setOrigin(0.5);
+        this.timerText = this.add.text(this.game.config.width / 2, 155, '', textStyle).setOrigin(0.5);
 
-        this.collectBtn = this.add.image(this.game.config.width - 400, uiPanelY + 15, 'button').setScale(1.2).setInteractive();
-        this.add.text(this.collectBtn.x, this.collectBtn.y, 'Собрать все', { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+        // --- НИЖНЯЯ ПАНЕЛЬ ---
+        const uiPanelY = this.game.config.height - 80;
+
+        // КНОПКИ РАЗНЕСЕНЫ ПО СТОРОНАМ
+        this.collectBtn = this.add.image(this.game.config.width / 4 + 50, uiPanelY, 'button').setScale(1.2).setInteractive();
+        this.add.text(this.collectBtn.x, this.collectBtn.y, 'Собрать', { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
         this.collectBtn.on('pointerdown', this.onCollectClicked, this);
 
-        const upgradeBtn = this.add.image(this.game.config.width - 150, uiPanelY + 15, 'button').setScale(1.2).setInteractive();
+        const upgradeBtn = this.add.image(this.game.config.width * 3 / 4 - 50, uiPanelY, 'button').setScale(1.2).setInteractive();
         this.add.text(upgradeBtn.x, upgradeBtn.y, 'Улучшить', { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
         upgradeBtn.on('pointerdown', () => {
-             this.sound.play('click'); // ИЗМЕНЕНО
+             this.sound.play('click');
              this.showUpgradePanel();
         });
     }
