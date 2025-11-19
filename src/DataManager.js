@@ -14,12 +14,10 @@ class DataManager {
         this.isDataDirty = false;
         this.SAVE_DELAY = 2000;
 
-        // НОВЫЕ СВОЙСТВА: Отслеживание монет за сессию
         this.sessionStartCoins = 0;
         this.coinsEarnedThisSession = 0;
     }
     
-    // НОВЫЙ МЕТОД: Вызывается в начале каждой игровой сессии
     startSessionTracking() {
         this.sessionStartCoins = this.getCoins();
         this.coinsEarnedThisSession = 0;
@@ -87,6 +85,20 @@ class DataManager {
             console.error('Failed to save player data to cloud:', error);
         }
     }
+
+    // --- НОВЫЕ МЕТОДЫ ДЛЯ УПРАВЛЕНИЯ ЗВУКОМ ---
+    isMuted() {
+        // Если в сохранениях нет такого поля, по умолчанию звук включен (isMuted = false)
+        return this.playerData.settings?.isMuted ?? false;
+    }
+
+    setMuted(isMuted) {
+        if (!this.playerData.settings) {
+            this.playerData.settings = {};
+        }
+        this.playerData.settings.isMuted = isMuted;
+        this.save(true); // Сохраняем настройку немедленно
+    }
     
     unlockIngredient(type) {
         if (!this.playerData.unlockedItems.includes(type)) {
@@ -106,7 +118,7 @@ class DataManager {
     
     addCoins(amount) {
         this.playerData.coins += amount;
-        this.coinsEarnedThisSession += amount; // Обновляем счетчик сессии
+        this.coinsEarnedThisSession += amount;
         this.markDirty();
     }
 
@@ -219,7 +231,11 @@ class DataManager {
                 knifeLevel: 0,
                 spatulaLevel: 0
             },
-            generators: {}
+            generators: {},
+            // Добавляем секцию настроек
+            settings: {
+                isMuted: false
+            }
         };
     }
 }

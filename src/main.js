@@ -10,19 +10,30 @@ import GeneratorScene from './scenes/GeneratorScene.js';
 
 const config = {
     type: Phaser.CANVAS,
-    width: 800,   // Это наша базовая ("дизайнерская") ширина
-    height: 1000, // Это наша базовая ("дизайнерская") высота
+    width: 800,
+    height: 1000,
     scene: [PreloaderScene, GameScene, UIScene, GameOverScene, CollectionScene, UpgradeScene, GeneratorScene],
     backgroundColor: '#333333',
-    
-    // --- ДОБАВЛЕН БЛОК МАСШТАБИРОВАНИЯ ---
     scale: {
-        // Режим 'FIT' вписывает наш холст в доступное пространство, сохраняя пропорции.
-        // Это самый безопасный и распространенный режим для портретных игр.
         mode: Phaser.Scale.FIT,
-        // Автоматически центрировать холст по горизонтали и вертикали.
         autoCenter: Phaser.Scale.CENTER_BOTH
     }
 };
 
 const game = new Phaser.Game(config);
+
+// --- ДОБАВЛЕН ОБРАБОТЧИК СВОРАЧИВАНИЯ ОКНА ---
+// Этот код будет работать глобально для всей игры
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        // Если вкладка стала неактивной - ставим игру на паузу
+        console.log('Tab is hidden, pausing game.');
+        game.scene.pauseAll();
+        game.sound.pauseAll();
+    } else {
+        // Если вкладка снова активна - возобновляем игру
+        console.log('Tab is visible, resuming game.');
+        game.scene.resumeAll();
+        game.sound.resumeAll();
+    }
+});

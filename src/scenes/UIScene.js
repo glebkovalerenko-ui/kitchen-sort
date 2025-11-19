@@ -18,66 +18,73 @@ export default class UIScene extends Phaser.Scene {
         this.coinsText = this.add.text(50, 90, 'Coins: ' + dataManager.getCoins(), { fontSize: '32px', fill: '#ffffff' });
         gameScene.events.on('updateCoins', (coins) => { this.coinsText.setText('Coins: ' + coins); }, this);
         
-        const collectionBtn = this.add.image(this.game.config.width - 150, 70, 'button')
-            .setOrigin(0.5)
-            .setInteractive()
-            .on('pointerdown', () => {
-                this.sound.play('click'); // ИЗМЕНЕНО
-                this.scene.pause('GameScene');
-                this.scene.launch('CollectionScene');
-            });
+        const collectionBtn = this.add.image(this.game.config.width - 150, 70, 'button').setOrigin(0.5).setInteractive();
         this.add.text(collectionBtn.x, collectionBtn.y, 'Book', { fontSize: '28px', fill: '#000'}).setOrigin(0.5);
+        collectionBtn.on('pointerdown', () => {
+            this.sound.play('click');
+            this.scene.pause('GameScene');
+            this.scene.launch('CollectionScene');
+        });
 
-        const upgradeBtn = this.add.image(collectionBtn.x - 220, 70, 'button')
-            .setOrigin(0.5)
-            .setInteractive()
-            .on('pointerdown', () => {
-                this.sound.play('click'); // ИЗМЕНЕНО
-                this.scene.pause('GameScene');
-                this.scene.launch('UpgradeScene');
-            });
+        const upgradeBtn = this.add.image(collectionBtn.x - 220, 70, 'button').setOrigin(0.5).setInteractive();
         this.add.text(upgradeBtn.x, upgradeBtn.y, 'Shop', { fontSize: '28px', fill: '#000'}).setOrigin(0.5);
+        upgradeBtn.on('pointerdown', () => {
+            this.sound.play('click');
+            this.scene.pause('GameScene');
+            this.scene.launch('UpgradeScene');
+        });
         
-        const clearBtn = this.add.image(this.game.config.width / 2, this.game.config.height - 70, 'button')
-            .setOrigin(0.5)
-            .setInteractive()
-            .on('pointerdown', () => {
-                this.sound.play('click'); // ИЗМЕНЕНО
-                this.showClearBoardPanel();
-            });
+        const clearBtn = this.add.image(this.game.config.width / 2, this.game.config.height - 70, 'button').setOrigin(0.5).setInteractive();
         this.add.text(clearBtn.x, clearBtn.y, 'Очистить', { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+        clearBtn.on('pointerdown', () => {
+            this.sound.play('click');
+            this.showClearBoardPanel();
+        });
+
+        // --- НОВАЯ КНОПКА MUTE ---
+        this.muteBtn = this.add.text(this.game.config.width - 60, this.game.config.height - 60, '🔊', { fontSize: '50px' }).setOrigin(0.5).setInteractive();
+        this.muteBtn.on('pointerdown', this.toggleMute, this);
+        
+        // Применяем состояние Mute при старте
+        this.applyMuteState();
 
         this.clearBoardPanel = null;
     }
+
+    toggleMute() {
+        const isMuted = !dataManager.isMuted();
+        dataManager.setMuted(isMuted);
+        this.applyMuteState();
+    }
+
+    applyMuteState() {
+        const isMuted = dataManager.isMuted();
+        this.sound.mute = isMuted;
+        this.muteBtn.setText(isMuted ? '🔇' : '🔊');
+    }
     
+    // ... (остальной код UIScene без изменений) ...
     showClearBoardPanel() {
         if (this.clearBoardPanel) return;
-
         const gameScene = this.scene.get('GameScene');
         this.clearBoardPanel = this.add.container(this.game.config.width / 2, this.game.config.height / 2);
         this.clearBoardPanel.setDepth(10);
-
-        const overlay = this.add.rectangle(0, 0, this.game.config.width, this.game.config.height, 0x000000, 0.7);
-        overlay.setInteractive();
+        const overlay = this.add.rectangle(0, 0, this.game.config.width, this.game.config.height, 0x000000, 0.7).setInteractive();
         this.clearBoardPanel.add(overlay);
-
         const panelBG = this.add.graphics();
         panelBG.fillStyle(0x333333, 1);
         panelBG.lineStyle(2, 0xffffff, 1);
         panelBG.fillRoundedRect(-250, -150, 500, 300, 16);
         this.clearBoardPanel.add(panelBG);
-        
         this.clearBoardPanel.add(this.add.text(0, -100, 'Очистить поле?', { fontSize: '32px', fill: '#fff' }).setOrigin(0.5));
-        
         const payBtn = this.add.image(0, 0, 'button').setScale(1.2).setInteractive();
         const payBtnText = this.add.text(payBtn.x, payBtn.y, `${CLEAR_BOARD_COST}`, { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
         this.clearBoardPanel.add([payBtn, payBtnText]);
-
         if (dataManager.getCoins() < CLEAR_BOARD_COST) {
             payBtn.setTint(0x888888).disableInteractive();
         } else {
             payBtn.on('pointerdown', () => {
-                this.sound.play('click'); // ИЗМЕНЕНО
+                this.sound.play('click');
                 if (dataManager.removeCoins(CLEAR_BOARD_COST)) {
                     dataManager.save(true);
                     this.events.emit('updateCoins', dataManager.getCoins());
@@ -86,13 +93,11 @@ export default class UIScene extends Phaser.Scene {
                 }
             });
         }
-        
         const adBtn = this.add.image(0, 100, 'button').setScale(1.2).setInteractive();
         const adBtnText = this.add.text(adBtn.x, adBtn.y, 'Бесплатно (Ad)', { fontSize: '28px', fill: '#000' }).setOrigin(0.5);
         this.clearBoardPanel.add([adBtn, adBtnText]);
-        
         adBtn.on('pointerdown', () => {
-            this.sound.play('click'); // ИЗМЕНЕНО
+            this.sound.play('click');
             adManager.showRewarded(gameScene, 'rewarded_clear_field', {
                 onRewarded: () => {
                     gameScene.clearBoard();
@@ -104,15 +109,13 @@ export default class UIScene extends Phaser.Scene {
                 }
             });
         });
-
         const closeBtn = this.add.text(230, -135, 'X', { fontSize: '32px', fill: '#ff0000' }).setOrigin(0.5).setInteractive();
         closeBtn.on('pointerdown', this.hideClearBoardPanel, this);
         this.clearBoardPanel.add(closeBtn);
     }
-    
     hideClearBoardPanel() {
         if (this.clearBoardPanel) {
-            this.sound.play('click'); // ИЗМЕНЕНО
+            this.sound.play('click');
             this.clearBoardPanel.destroy();
             this.clearBoardPanel = null;
         }
