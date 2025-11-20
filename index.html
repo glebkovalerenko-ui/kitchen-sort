@@ -5,11 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kitchen Sort</title>
     
-    <!-- Этот блок будет динамически подключать нужный скрипт -->
     <script>
         (function() {
-            // УЛУЧШЕННАЯ ПРОВЕРКА: Считаем локальной средой localhost, 127.0.0.1,
-            // а также любые IP-адреса, начинающиеся с '192.168.' или '10.'
             const hostname = window.location.hostname;
             const isLocal = (
                 hostname === 'localhost' ||
@@ -20,11 +17,9 @@
             const script = document.createElement('script');
             
             if (isLocal) {
-                // Если локально, подключаем нашу заглушку
-                script.src = '/YandexSDKMock.js';
+                script.src = '/src/YandexSDKMock.js';
                 console.log('LOADING LOCAL YANDEX SDK MOCK. Hostname:', hostname);
             } else {
-                // Если на сервере (на Яндексе), подключаем настоящий SDK
                 script.src = 'https://yandex.ru/games/sdk/v2';
                 console.log('Loading official Yandex SDK.');
             }
@@ -38,6 +33,7 @@
     </style>
 </head>
 <body>
+    <!-- Эта строка снова важна. Плагин найдет ее и заменит на встроенный код -->
     <script type="module" src="/src/main.js"></script>
 </body>
 </html>

@@ -9,9 +9,11 @@
     "preview": "vite preview --host"
   },
   "devDependencies": {
-    "vite": "^7.2.2"
+    "@vitejs/plugin-legacy": "^7.2.1",
+    "vite": "^7.2.2",
+    "vite-plugin-singlefile": "^2.3.0"
   },
   "dependencies": {
-  "phaser": "3.80.1"
+    "phaser": "3.80.1"
   }
 }
