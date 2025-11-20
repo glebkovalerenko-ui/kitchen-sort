@@ -21,6 +21,8 @@ export default class GameOverScene extends Phaser.Scene {
 
         this.add.text(this.game.config.width / 2, 150, localizationManager.getString('game_over_title'), { fontSize: '58px', fill: '#ff0000' }).setOrigin(0.5);
         this.add.text(this.game.config.width / 2, 230, localizationManager.getString('final_score') + ' ' + this.finalScore, { fontSize: '48px', fill: '#ffffff' }).setOrigin(0.5);
+        
+        // Эта строка теперь будет работать корректно, отображая монеты.
         this.add.text(this.game.config.width / 2, 280, localizationManager.getString('coins_earned', { coins: this.coinsEarned }), { fontSize: '32px', fill: '#ffff00' }).setOrigin(0.5);
 
         try {
@@ -64,15 +66,16 @@ export default class GameOverScene extends Phaser.Scene {
         this.add.text(restartBtn.x, restartBtn.y, localizationManager.getString('btn_restart'), { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
         restartBtn.on('pointerdown', () => { 
             this.sound.play('click');
-            this.scene.get('GameScene').events.emit('showUI'); // <-- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ
+            this.scene.get('GameScene').events.emit('showUI');
             this.scene.start('GameScene');
         });
 
-        // --- ИСПРАВЛЕНИЕ ВЕРСТКИ КНОПКИ "ПРОДОЛЖИТЬ" ---
         const continueRewardDesc = this.add.text(this.game.config.width / 2, 630, localizationManager.getString('continue_reward_desc'), { fontSize: '22px', fill: '#90ee90', align: 'center' }).setOrigin(0.5);
-        const continueBtn = this.add.image(this.game.config.width / 2, 680, 'button').setOrigin(0.5).setInteractive();
-        // Используем более короткий ключ для кнопки
-        const continueText = this.add.text(continueBtn.x, continueBtn.y, localizationManager.getString('btn_continue_ad_reward').replace(' (+3 заряда)', ''), { fontSize: '28px', fill: '#000' }).setOrigin(0.5);
+        
+        // --- ИЗМЕНЕНИЕ: УВЕЛИЧИВАЕМ РАЗМЕР КНОПКИ, АНАЛОГИЧНО КНОПКЕ "УДВОИТЬ" ---
+        const continueBtn = this.add.image(this.game.config.width / 2, 710, 'button').setOrigin(0.5).setScale(1.2).setInteractive();
+        
+        const continueText = this.add.text(continueBtn.x, continueBtn.y, localizationManager.getString('btn_continue_ad_short'), { fontSize: '28px', fill: '#000' }).setOrigin(0.5);
         
         continueBtn.on('pointerdown', () => {
             this.sound.play('click');
@@ -81,7 +84,7 @@ export default class GameOverScene extends Phaser.Scene {
 
             adManager.showRewarded(this, 'rewarded_continue', {
                 onRewarded: () => { 
-                    this.scene.get('GameScene').events.emit('showUI'); // <-- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ
+                    this.scene.get('GameScene').events.emit('showUI');
                     this.scene.start('GameScene', { continueGame: true, gridState: this.gridState, score: this.finalScore }); 
                 },
                 onError: () => {
@@ -90,7 +93,7 @@ export default class GameOverScene extends Phaser.Scene {
                 onClose: () => {
                     if (continueBtn.active) {
                         continueBtn.setInteractive().clearTint();
-                        continueText.setText(localizationManager.getString('btn_continue_ad_reward').replace(' (+3 заряда)', ''));
+                        continueText.setText(localizationManager.getString('btn_continue_ad_short'));
                     }
                 }
             });

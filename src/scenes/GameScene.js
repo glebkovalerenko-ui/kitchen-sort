@@ -30,7 +30,7 @@ export default class GameScene extends Phaser.Scene {
         this.ingredientsGroup = this.add.group();
         
         this.sessionStartTime = Date.now();
-        dataManager.startSessionTracking();
+        // dataManager.startSessionTracking(); // <-- УДАЛЕНО ОТСЮДА
         
         this.gridManager = new GridManager(this);
         this.mergeSystem = new MergeSystem();
@@ -194,6 +194,9 @@ export default class GameScene extends Phaser.Scene {
     startNewGame() {
         this.score = 0;
         dataManager.setScore(0);
+        // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: ОТСЧЁТ СЕССИИ НАЧИНАЕТСЯ ЗДЕСЬ ---
+        dataManager.startSessionTracking();
+        // --- КОНЕЦ ИЗМЕНЕНИЯ ---
         this.addCollectedItemsToGrid(TILE_TYPES.EGG, 2);
         this.addCollectedItemsToGrid(TILE_TYPES.TOMATO, 2);
         this.updateGridSave();
@@ -234,7 +237,7 @@ export default class GameScene extends Phaser.Scene {
 
     triggerGameOver() {
         console.log("GAME OVER! No more moves.");
-        this.events.emit('hideUI'); // <-- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ
+        this.events.emit('hideUI');
         dataManager.clearGridState();
         const sessionDuration = Math.round((Date.now() - this.sessionStartTime) / 1000);
         const coinsEarned = dataManager.getCoinsEarnedThisSession();

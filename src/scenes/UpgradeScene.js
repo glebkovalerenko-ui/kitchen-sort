@@ -33,7 +33,6 @@ export default class UpgradeScene extends Phaser.Scene {
         const level = dataManager.getGadgetLevel(gadgetId);
         const cost = dataManager.getGadgetUpgradeCost(gadgetId);
         
-        // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: ИСПОЛЬЗУЕМ КЛЮЧИ ЛОКАЛИЗАЦИИ ---
         const gadgetName = localizationManager.getString(`gadget_${gadgetId}_name`);
         const gadgetDesc = localizationManager.getString(`gadget_${gadgetId}_desc`);
         const currentLevelText = localizationManager.getString('gadget_level', { level: level });
@@ -41,7 +40,9 @@ export default class UpgradeScene extends Phaser.Scene {
         this.add.text(this.game.config.width / 2, y, `${gadgetName} ${currentLevelText}`, { fontSize: '32px', fill: '#ffffff' }).setOrigin(0.5);
         this.add.text(this.game.config.width / 2, y + 45, gadgetDesc, { fontSize: '22px', fill: '#cccccc', wordWrap: { width: 600 }, align: 'center' }).setOrigin(0.5);
 
-        const buyBtn = this.add.image(this.game.config.width / 2, y + 110, 'button').setOrigin(0.5).setInteractive();
+        // --- ИЗМЕНЕНИЕ: УВЕЛИЧЕН ОТСТУП ДЛЯ КНОПКИ ---
+        // Было y + 110, стало y + 130
+        const buyBtn = this.add.image(this.game.config.width / 2, y + 130, 'button').setOrigin(0.5).setInteractive();
         const buyBtnText = this.add.text(buyBtn.x, buyBtn.y, localizationManager.getString('btn_gadget_upgrade', { cost: cost }), { fontSize: '24px', fill: '#000'}).setOrigin(0.5);
         
         buyBtn.on('pointerdown', () => {

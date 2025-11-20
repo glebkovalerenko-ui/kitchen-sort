@@ -68,13 +68,10 @@ export default class UIScene extends Phaser.Scene {
             this.muteBtn
         ]);
 
-        // --- ЛОГИКА СКРЫТИЯ/ПОКАЗА UI ---
-        // Слушаем события от других сцен, чтобы управлять видимостью
         const gameEvents = this.scene.get('GameScene').events;
         gameEvents.on('hideUI', () => this.uiContainer.setVisible(false), this);
         gameEvents.on('showUI', () => this.uiContainer.setVisible(true), this);
 
-        // Также отписываемся, когда сама UIScene уничтожается
         this.events.on('shutdown', () => {
             gameEvents.off('hideUI');
             gameEvents.off('showUI');
@@ -101,6 +98,7 @@ export default class UIScene extends Phaser.Scene {
         this.muteBtn.setText(isMuted ? '🔇' : '🔊');
     }
     
+    // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: РЕФАКТОРИНГ ОКНА ОЧИСТКИ ПОЛЯ ---
     showClearBoardPanel() {
         if (this.clearBoardPanel) return;
 
@@ -109,11 +107,15 @@ export default class UIScene extends Phaser.Scene {
         this.clearBoardPanel.setDepth(10);
 
         const overlay = this.add.rectangle(0, 0, this.game.config.width, this.game.config.height, 0x000000, 0.7).setInteractive();
-        const panelHeight = 380;
-        const panelBG = this.add.graphics().fillStyle(0x333333, 1).lineStyle(2, 0xffffff, 1).fillRoundedRect(-250, -panelHeight / 2, 500, panelHeight, 16);
-        const title = this.add.text(0, -130, localizationManager.getString('clear_board_title'), { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
         
-        const payBtn = this.add.image(0, -20, 'button').setScale(1.2).setInteractive();
+        // Увеличена высота панели для комфортного размещения всех элементов
+        const panelHeight = 480;
+        const panelBG = this.add.graphics().fillStyle(0x333333, 1).lineStyle(2, 0xffffff, 1).fillRoundedRect(-250, -panelHeight / 2, 500, panelHeight, 16);
+        
+        // Пересчитаны позиции элементов
+        const title = this.add.text(0, -panelHeight / 2 + 50, localizationManager.getString('clear_board_title'), { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
+        
+        const payBtn = this.add.image(0, -60, 'button').setScale(1.2).setInteractive();
         const payBtnText = this.add.text(payBtn.x, payBtn.y, `${CLEAR_BOARD_COST}`, { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
         
         if (dataManager.getCoins() < CLEAR_BOARD_COST) {
@@ -130,7 +132,7 @@ export default class UIScene extends Phaser.Scene {
             });
         }
         
-        const adBtn = this.add.image(0, payBtn.y + 110, 'button').setScale(1.2).setInteractive();
+        const adBtn = this.add.image(0, 60, 'button').setScale(1.2).setInteractive();
         const adBtnText = this.add.text(adBtn.x, adBtn.y, localizationManager.getString('clear_board_ad'), { fontSize: '28px', fill: '#000' }).setOrigin(0.5);
         
         adBtn.on('pointerdown', () => {
@@ -153,10 +155,12 @@ export default class UIScene extends Phaser.Scene {
             });
         });
 
-        const closeBtn = this.add.text(230, -panelHeight / 2 + 20, 'X', { fontSize: '40px', fill: '#ff0000' }).setOrigin(0.5).setInteractive();
-        closeBtn.on('pointerdown', this.hideClearBoardPanel, this);
+        // "Крестик" заменен на стандартную кнопку "Назад"
+        const backBtn = this.add.image(0, panelHeight / 2 - 60, 'button').setInteractive();
+        const backBtnText = this.add.text(backBtn.x, backBtn.y, localizationManager.getString('btn_back'), { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+        backBtn.on('pointerdown', this.hideClearBoardPanel, this);
         
-        this.clearBoardPanel.add([overlay, panelBG, title, payBtn, payBtnText, adBtn, adBtnText, closeBtn]);
+        this.clearBoardPanel.add([overlay, panelBG, title, payBtn, payBtnText, adBtn, adBtnText, backBtn, backBtnText]);
     }
 
     hideClearBoardPanel() {

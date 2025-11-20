@@ -1,5 +1,6 @@
 // /src/AdManager.js
 import { analyticsManager } from './AnalyticsManager.js';
+import { dataManager } from './DataManager.js'; // <-- ИМПОРТ
 
 class AdManager {
     constructor() {
@@ -18,6 +19,13 @@ class AdManager {
             return;
         }
 
+        // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: ПРОВЕРКА КУЛДАУНА ---
+        if (!dataManager.canShowInterstitial()) {
+            console.log('Interstitial Ad request skipped due to cooldown.');
+            return;
+        }
+        // --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
         this.isAdOpen = true;
         scene.sound.pauseAll();
         // Приостанавливаем саму сцену, чтобы остановить update-цикл и таймеры
@@ -26,6 +34,10 @@ class AdManager {
         this.ysdk.adv.showFullscreenAdv({
             callbacks: {
                 onClose: (wasShown) => {
+                    // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: ЗАПИСЬ ВРЕМЕНИ ПОКАЗА ---
+                    dataManager.recordInterstitialShow();
+                    // --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
                     console.log('Interstitial Ad closed. Was shown:', wasShown);
                     analyticsManager.trackAdWatched('interstitial_gameover', wasShown ? 'success' : 'closed');
                     scene.sound.resumeAll();

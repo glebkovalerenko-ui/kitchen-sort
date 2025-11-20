@@ -4,6 +4,7 @@ import { GADGETS, GENERATORS } from './GameConfig.js';
 import { analyticsManager } from './AnalyticsManager.js';
 
 const SAVE_KEY = 'playerData';
+const INTERSTITIAL_COOLDOWN = 90000; // 90 секунд в миллисекундах
 
 class DataManager {
     constructor() {
@@ -40,12 +41,16 @@ class DataManager {
             const data = await this.player.getData([SAVE_KEY]);
             if (data && data[SAVE_KEY]) {
                 this.playerData = data[SAVE_KEY];
-                // --- ДОБАВЛЕНА ОБРАБОТКА ДЛЯ СОВМЕСТИМОСТИ СТАРЫХ СОХРАНЕНИЙ ---
+                // --- ОБРАБОТКА ДЛЯ СОВМЕСТИМОСТИ СТАРЫХ СОХРАНЕНИЙ ---
                 if (this.playerData.savedGrid === undefined) {
                     this.playerData.savedGrid = null;
                 }
                 if (this.playerData.score === undefined) {
                     this.playerData.score = 0;
+                }
+                // --- ДОБАВЛЕНА ОБРАБОТКА ДЛЯ НОВОГО ПОЛЯ РЕКЛАМЫ ---
+                if (this.playerData.lastInterstitialShowTimestamp === undefined) {
+                    this.playerData.lastInterstitialShowTimestamp = 0;
                 }
                 console.log('Player data loaded from cloud:', this.playerData);
             } else {
@@ -91,6 +96,21 @@ class DataManager {
         } catch (error) {
             console.error('Failed to save player data to cloud:', error);
         }
+    }
+
+    // --- УПРАВЛЕНИЕ РЕКЛАМОЙ ---
+    canShowInterstitial() {
+        const now = Date.now();
+        const lastShown = this.playerData.lastInterstitialShowTimestamp || 0;
+        const canShow = (now - lastShown) > INTERSTITIAL_COOLDOWN;
+        console.log(`[AdManager] Checking Interstitial Cooldown. Can show: ${canShow}`);
+        return canShow;
+    }
+
+    recordInterstitialShow() {
+        this.playerData.lastInterstitialShowTimestamp = Date.now();
+        this.save(true); // Немедленное сохранение
+        console.log(`[AdManager] Interstitial timestamp recorded: ${this.playerData.lastInterstitialShowTimestamp}`);
     }
 
     // --- УПРАВЛЕНИЕ ЗВУКОМ ---
@@ -241,9 +261,10 @@ class DataManager {
     getDefaultData() {
         return {
             coins: 0,
-            score: 0, // <-- ДОБАВЛЕНО
+            score: 0,
             unlockedItems: ['egg', 'tomato'],
-            savedGrid: null, // <-- ДОБАВЛЕНО
+            savedGrid: null,
+            lastInterstitialShowTimestamp: 0, // <-- НОВОЕ ПОЛЕ
             gadgets: {
                 knifeLevel: 0,
                 spatulaLevel: 0
