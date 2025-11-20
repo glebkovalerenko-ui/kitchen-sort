@@ -85,6 +85,14 @@ const leaderboardMock = {
 window.YaGames = {
     init: () => {
         console.log('[MOCK SDK] YaGames.init called.');
+        
+        // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ ---
+        // Пытаемся определить язык браузера. navigator.language возвращает что-то вроде 'ru-RU' или 'en-US'.
+        const browserLang = navigator.language.substring(0, 2); 
+        const supportedLang = ['ru', 'en'].includes(browserLang) ? browserLang : 'en';
+        console.log(`[MOCK SDK] Detected browser language: ${browserLang}, using: ${supportedLang}`);
+        // --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
         return Promise.resolve({
             adv: advMock,
             metrica: metricaMock,
@@ -92,14 +100,13 @@ window.YaGames = {
                 Leaderboards: { isFeatureAvailable: true },
                 LoadingAPI: { ready: () => console.log('[MOCK SDK] LoadingAPI.ready() called.') }
             },
-            // <-- ВОТ ИСПРАВЛЕНИЕ: ДОБАВЛЕН НЕДОСТАЮЩИЙ ОБЪЕКТ -->
             environment: {
                 i18n: {
-                    lang: 'ru' // Имитируем русский язык по умолчанию для локального теста
+                    // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: ИСПОЛЬЗУЕМ ОПРЕДЕЛЕННЫЙ ЯЗЫК ---
+                    lang: supportedLang 
                 },
-                payload: null // Добавляем на всякий случай, чтобы избежать других ошибок
+                payload: null
             },
-            // <-- КОНЕЦ ИСПРАВЛЕНИЯ -->
             getPlayer: () => {
                 console.log('[MOCK SDK] ysdk.getPlayer called.');
                 return localStorageMock.init();

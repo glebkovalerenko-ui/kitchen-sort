@@ -33,5 +33,19 @@
     "gadget_level": "(Lvl. {level})",
     "btn_gadget_upgrade": "Upgrade: {cost}",
     "clear_board_title": "Clear the board?",
-    "sdk_init_error": "Could not connect to game server. Please check your internet connection and try again."
+    "sdk_init_error": "Could not connect to game server. Please check your internet connection and try again.",
+    "gadget_knife_name": "Sharp Knife",
+    "gadget_knife_desc": "Increases coins from merges by 10% per level.",
+    "gadget_spatula_name": "Golden Spatula",
+    "gadget_spatula_desc": "Increases score from merges by 10% per level.",
+    "generator_coop_name": "Coop",
+    "generator_greenhouse_name": "Greenhouse",
+    "upgrade_capacity_name": "New Nest",
+    "upgrade_speed_name": "Better Feed",
+    "upgrade_bonus_name": "Purebred Chickens",
+    "upgrade_capacity_name_greenhouse": "New Bush",
+    "upgrade_speed_name_greenhouse": "Watering System",
+    "upgrade_bonus_name_greenhouse": "Fertilizers",
+    "continue_reward_desc": "Restore the board and get +3 charges",
+    "generator_boost_desc": "Instantly get 1 extra charge"
 }

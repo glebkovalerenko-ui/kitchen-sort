@@ -46,9 +46,6 @@ export default class GameScene extends Phaser.Scene {
             this.sound.play('music', { loop: true, volume: 0.4 });
         }
         
-        // --- ИЗМЕНЕНИЕ: НЕ ЗАПУСКАЕМ UIScene, А ПРОСТО ПЕРЕЗАПУСКАЕМ ЕГО ДАННЫЕ ---
-        this.scene.get('UIScene').events.emit('gameStart');
-
         this.createGeneratorIcons();
         
         if (this.shouldContinueFromGameOver && this.gridStateFromGameOver) {
@@ -237,13 +234,13 @@ export default class GameScene extends Phaser.Scene {
 
     triggerGameOver() {
         console.log("GAME OVER! No more moves.");
+        this.events.emit('hideUI'); // <-- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ
         dataManager.clearGridState();
         const sessionDuration = Math.round((Date.now() - this.sessionStartTime) / 1000);
         const coinsEarned = dataManager.getCoinsEarnedThisSession();
         
         const currentGridState = this.saveGridState();
         
-        // --- ИЗМЕНЕНИЕ: НЕ ОСТАНАВЛИВАЕМ UIScene ---
         this.scene.start('GameOverScene', { 
             score: this.score, 
             gridState: currentGridState,

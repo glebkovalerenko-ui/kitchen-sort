@@ -33,5 +33,19 @@
     "gadget_level": "(Ур. {level})",
     "btn_gadget_upgrade": "Улучшить: {cost}",
     "clear_board_title": "Очистить поле?",
-    "sdk_init_error": "Не удалось подключиться к серверу. Проверьте интернет-соединение и попробуйте снова."
+    "sdk_init_error": "Не удалось подключиться к серверу. Проверьте интернет-соединение и попробуйте снова.",
+    "gadget_knife_name": "Острый Нож",
+    "gadget_knife_desc": "Увеличивает монеты за слияние на 10% за уровень.",
+    "gadget_spatula_name": "Золотая Лопатка",
+    "gadget_spatula_desc": "Увеличивает очки за слияние на 10% за уровень.",
+    "generator_coop_name": "Курятник",
+    "generator_greenhouse_name": "Теплица",
+    "upgrade_capacity_name": "Новое гнездо",
+    "upgrade_speed_name": "Улучшенный корм",
+    "upgrade_bonus_name": "Породистые куры",
+    "upgrade_capacity_name_greenhouse": "Новый куст",
+    "upgrade_speed_name_greenhouse": "Система полива",
+    "upgrade_bonus_name_greenhouse": "Удобрения",
+    "continue_reward_desc": "Восстановить поле и получить +3 заряда",
+    "generator_boost_desc": "Мгновенно получить 1 дополнительный заряд"
 }

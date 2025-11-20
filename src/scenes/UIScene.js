@@ -7,28 +7,28 @@ import { localizationManager } from '../LocalizationManager.js';
 
 export default class UIScene extends Phaser.Scene {
     constructor() {
-        super('UIScene'); // <-- УБРАЛИ active: true
+        super('UIScene');
     }
 
     create() {
+        this.uiContainer = this.add.container(); // <-- ВСЕ ЭЛЕМЕНЕНТЫ ТЕПЕРЬ В КОНТЕЙНЕРЕ
+
         const gameScene = this.scene.get('GameScene'); 
         const textStyle = { fontSize: '32px', fill: '#ffffff', stroke: '#000000', strokeThickness: 5 };
 
         this.scoreText = this.add.text(40, 40, '', textStyle);
         this.coinsText = this.add.text(40, 80, '', textStyle);
         
-        // Подписываемся на события GameScene
         gameScene.events.on('updateScore', this.updateScore, this);
         gameScene.events.on('updateCoins', this.updateCoins, this);
         
-        // Обновляем UI начальными значениями
         this.updateScore(gameScene.score);
         this.updateCoins(dataManager.getCoins());
         
         const padding = 20;
         
         const collectionBtn = this.add.image(this.game.config.width - padding, 70, 'button').setOrigin(1, 0.5).setInteractive();
-        this.add.text(collectionBtn.getCenter().x, collectionBtn.getCenter().y, localizationManager.getString('btn_collection'), { fontSize: '28px', fill: '#000'}).setOrigin(0.5);
+        const collectionBtnText = this.add.text(collectionBtn.getCenter().x, collectionBtn.getCenter().y, localizationManager.getString('btn_collection'), { fontSize: '28px', fill: '#000'}).setOrigin(0.5);
         collectionBtn.on('pointerdown', () => {
             this.sound.play('click');
             this.scene.pause('GameScene');
@@ -36,7 +36,7 @@ export default class UIScene extends Phaser.Scene {
         });
 
         const upgradeBtn = this.add.image(collectionBtn.getLeftCenter().x - padding, 70, 'button').setOrigin(1, 0.5).setInteractive();
-        this.add.text(upgradeBtn.getCenter().x, upgradeBtn.getCenter().y, localizationManager.getString('btn_upgrades'), { fontSize: '28px', fill: '#000'}).setOrigin(0.5);
+        const upgradeBtnText = this.add.text(upgradeBtn.getCenter().x, upgradeBtn.getCenter().y, localizationManager.getString('btn_upgrades'), { fontSize: '28px', fill: '#000'}).setOrigin(0.5);
         upgradeBtn.on('pointerdown', () => {
             this.sound.play('click');
             this.scene.pause('GameScene');
@@ -44,7 +44,7 @@ export default class UIScene extends Phaser.Scene {
         });
         
         const clearBtn = this.add.image(this.game.config.width / 2, this.game.config.height - 70, 'button').setOrigin(0.5).setInteractive();
-        this.add.text(clearBtn.x, clearBtn.y, localizationManager.getString('btn_clear'), { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+        const clearBtnText = this.add.text(clearBtn.x, clearBtn.y, localizationManager.getString('btn_clear'), { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
         clearBtn.on('pointerdown', () => {
             this.sound.play('click');
             this.showClearBoardPanel();
@@ -55,6 +55,30 @@ export default class UIScene extends Phaser.Scene {
         
         this.applyMuteState();
         this.clearBoardPanel = null;
+
+        this.uiContainer.add([
+            this.scoreText, 
+            this.coinsText, 
+            collectionBtn, 
+            collectionBtnText, 
+            upgradeBtn, 
+            upgradeBtnText, 
+            clearBtn, 
+            clearBtnText, 
+            this.muteBtn
+        ]);
+
+        // --- ЛОГИКА СКРЫТИЯ/ПОКАЗА UI ---
+        // Слушаем события от других сцен, чтобы управлять видимостью
+        const gameEvents = this.scene.get('GameScene').events;
+        gameEvents.on('hideUI', () => this.uiContainer.setVisible(false), this);
+        gameEvents.on('showUI', () => this.uiContainer.setVisible(true), this);
+
+        // Также отписываемся, когда сама UIScene уничтожается
+        this.events.on('shutdown', () => {
+            gameEvents.off('hideUI');
+            gameEvents.off('showUI');
+        });
     }
 
     updateScore(score) {

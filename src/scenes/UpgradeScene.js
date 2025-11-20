@@ -2,7 +2,7 @@
 import Phaser from 'phaser';
 import { dataManager } from '../DataManager.js';
 import { GADGETS } from '../GameConfig.js';
-import { localizationManager } from '../LocalizationManager.js'; // <-- ИМПОРТ
+import { localizationManager } from '../LocalizationManager.js';
 
 export default class UpgradeScene extends Phaser.Scene {
     constructor() {
@@ -30,13 +30,16 @@ export default class UpgradeScene extends Phaser.Scene {
     }
 
     createGadgetCard(gadgetId, y) {
-        const gadget = GADGETS[gadgetId];
         const level = dataManager.getGadgetLevel(gadgetId);
         const cost = dataManager.getGadgetUpgradeCost(gadgetId);
+        
+        // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: ИСПОЛЬЗУЕМ КЛЮЧИ ЛОКАЛИЗАЦИИ ---
+        const gadgetName = localizationManager.getString(`gadget_${gadgetId}_name`);
+        const gadgetDesc = localizationManager.getString(`gadget_${gadgetId}_desc`);
         const currentLevelText = localizationManager.getString('gadget_level', { level: level });
 
-        this.add.text(this.game.config.width / 2, y, `${gadget.name} ${currentLevelText}`, { fontSize: '32px', fill: '#ffffff' }).setOrigin(0.5);
-        this.add.text(this.game.config.width / 2, y + 45, gadget.description, { fontSize: '22px', fill: '#cccccc', wordWrap: { width: 600 }, align: 'center' }).setOrigin(0.5);
+        this.add.text(this.game.config.width / 2, y, `${gadgetName} ${currentLevelText}`, { fontSize: '32px', fill: '#ffffff' }).setOrigin(0.5);
+        this.add.text(this.game.config.width / 2, y + 45, gadgetDesc, { fontSize: '22px', fill: '#cccccc', wordWrap: { width: 600 }, align: 'center' }).setOrigin(0.5);
 
         const buyBtn = this.add.image(this.game.config.width / 2, y + 110, 'button').setOrigin(0.5).setInteractive();
         const buyBtnText = this.add.text(buyBtn.x, buyBtn.y, localizationManager.getString('btn_gadget_upgrade', { cost: cost }), { fontSize: '24px', fill: '#000'}).setOrigin(0.5);
@@ -44,7 +47,8 @@ export default class UpgradeScene extends Phaser.Scene {
         buyBtn.on('pointerdown', () => {
             this.sound.play('click');
             if (dataManager.upgradeGadget(gadgetId)) {
-                this.scene.restart(); // Перезапускаем сцену, чтобы обновить всю информацию
+                this.scene.get('GameScene').events.emit('updateCoins', dataManager.getCoins());
+                this.scene.restart();
             } else {
                 this.tweens.add({
                     targets: buyBtn,
