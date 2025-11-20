@@ -7,11 +7,13 @@ import GameOverScene from './scenes/GameOverScene.js';
 import CollectionScene from './scenes/CollectionScene.js';
 import UpgradeScene from './scenes/UpgradeScene.js';
 import GeneratorScene from './scenes/GeneratorScene.js';
+import { dataManager } from './DataManager.js';
 
 const config = {
     type: Phaser.CANVAS,
     width: 800,
     height: 1000,
+    // --- ИЗМЕНЕНИЕ: УКАЗЫВАЕМ ВСЕ СЦЕНЫ, НО ЗАПУСКАТЬСЯ БУДЕТ ПЕРВАЯ ---
     scene: [PreloaderScene, GameScene, UIScene, GameOverScene, CollectionScene, UpgradeScene, GeneratorScene],
     backgroundColor: '#333333',
     scale: {
@@ -22,18 +24,15 @@ const config = {
 
 const game = new Phaser.Game(config);
 
-// --- ДОБАВЛЕН ОБРАБОТЧИК СВОРАЧИВАНИЯ ОКНА ---
-// Этот код будет работать глобально для всей игры
+game.canvas.oncontextmenu = (e) => e.preventDefault();
+
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-        // Если вкладка стала неактивной - ставим игру на паузу
-        console.log('Tab is hidden, pausing game.');
-        game.scene.pauseAll();
+        console.log('Tab is hidden, pausing game and forcing save.');
+        dataManager.save(true);
         game.sound.pauseAll();
     } else {
-        // Если вкладка снова активна - возобновляем игру
-        console.log('Tab is visible, resuming game.');
-        game.scene.resumeAll();
+        console.log('Tab is visible, resuming sound.');
         game.sound.resumeAll();
     }
 });

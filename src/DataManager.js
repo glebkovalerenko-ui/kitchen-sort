@@ -1,6 +1,6 @@
 // /src/DataManager.js
 
-import { GADGETS, GENERATORS } from './gameConfig.js';
+import { GADGETS, GENERATORS } from './GameConfig.js';
 import { analyticsManager } from './AnalyticsManager.js';
 
 const SAVE_KEY = 'playerData';
@@ -40,6 +40,13 @@ class DataManager {
             const data = await this.player.getData([SAVE_KEY]);
             if (data && data[SAVE_KEY]) {
                 this.playerData = data[SAVE_KEY];
+                // --- ДОБАВЛЕНА ОБРАБОТКА ДЛЯ СОВМЕСТИМОСТИ СТАРЫХ СОХРАНЕНИЙ ---
+                if (this.playerData.savedGrid === undefined) {
+                    this.playerData.savedGrid = null;
+                }
+                if (this.playerData.score === undefined) {
+                    this.playerData.score = 0;
+                }
                 console.log('Player data loaded from cloud:', this.playerData);
             } else {
                 console.log('No data in cloud. Using default data.');
@@ -86,9 +93,8 @@ class DataManager {
         }
     }
 
-    // --- НОВЫЕ МЕТОДЫ ДЛЯ УПРАВЛЕНИЯ ЗВУКОМ ---
+    // --- УПРАВЛЕНИЕ ЗВУКОМ ---
     isMuted() {
-        // Если в сохранениях нет такого поля, по умолчанию звук включен (isMuted = false)
         return this.playerData.settings?.isMuted ?? false;
     }
 
@@ -97,9 +103,10 @@ class DataManager {
             this.playerData.settings = {};
         }
         this.playerData.settings.isMuted = isMuted;
-        this.save(true); // Сохраняем настройку немедленно
+        this.save(true);
     }
     
+    // --- УПРАВЛЕНИЕ КОЛЛЕКЦИЕЙ ---
     unlockIngredient(type) {
         if (!this.playerData.unlockedItems.includes(type)) {
             this.playerData.unlockedItems.push(type);
@@ -114,6 +121,7 @@ class DataManager {
         return this.playerData.unlockedItems.includes(type);
     }
 
+    // --- УПРАВЛЕНИЕ ВАЛЮТОЙ И ОЧКАМИ ---
     getCoins() { return this.playerData.coins; }
     
     addCoins(amount) {
@@ -135,11 +143,27 @@ class DataManager {
         return this.coinsEarnedThisSession;
     }
 
+    getScore() { return this.playerData.score; }
+    setScore(score) {
+        this.playerData.score = score;
+        this.markDirty();
+    }
+    
+    // --- УПРАВЛЕНИЕ ИГРОВЫМ ПОЛЕМ ---
+    getGridState() { return this.playerData.savedGrid; }
+    setGridState(gridState) {
+        this.playerData.savedGrid = gridState;
+        this.markDirty();
+    }
+    clearGridState() {
+        this.playerData.savedGrid = null;
+        this.playerData.score = 0;
+        this.save(true); // Немедленно сохраняем, чтобы при обновлении не загрузилась старая игра
+    }
+
+    // --- УПРАВЛЕНИЕ ГАДЖЕТАМИ ---
     getGadgetLevel(gadgetId) {
-        if (!this.playerData.gadgets[gadgetId + 'Level']) {
-            return 0;
-        }
-        return this.playerData.gadgets[gadgetId + 'Level'];
+        return this.playerData.gadgets[gadgetId + 'Level'] ?? 0;
     }
 
     getGadgetUpgradeCost(gadgetId) {
@@ -151,7 +175,7 @@ class DataManager {
     upgradeGadget(gadgetId) {
         const cost = this.getGadgetUpgradeCost(gadgetId);
         if (this.removeCoins(cost)) {
-            const newLevel = this.playerData.gadgets[gadgetId + 'Level'] + 1;
+            const newLevel = this.getGadgetLevel(gadgetId) + 1;
             this.playerData.gadgets[gadgetId + 'Level'] = newLevel;
             analyticsManager.trackGadgetUpgraded(gadgetId, newLevel);
             this.save(true);
@@ -160,6 +184,7 @@ class DataManager {
         return false;
     }
     
+    // --- УПРАВЛЕНИЕ ГЕНЕРАТОРАМИ ---
     getGeneratorState(generatorId) {
         if (!this.playerData.generators[generatorId]) {
             this.playerData.generators[generatorId] = {
@@ -172,16 +197,6 @@ class DataManager {
             this.markDirty();
         }
         return this.playerData.generators[generatorId];
-    }
-
-    useGeneratorCharge(generatorId) {
-        const state = this.getGeneratorState(generatorId);
-        if (state.charges > 0) {
-            state.charges--;
-            this.markDirty();
-            return true;
-        }
-        return false;
     }
     
     setGeneratorState(generatorId, state) {
@@ -226,13 +241,14 @@ class DataManager {
     getDefaultData() {
         return {
             coins: 0,
+            score: 0, // <-- ДОБАВЛЕНО
             unlockedItems: ['egg', 'tomato'],
+            savedGrid: null, // <-- ДОБАВЛЕНО
             gadgets: {
                 knifeLevel: 0,
                 spatulaLevel: 0
             },
             generators: {},
-            // Добавляем секцию настроек
             settings: {
                 isMuted: false
             }

@@ -1,5 +1,5 @@
 // /src/systems/MergeSystem.js
-import { RECIPES } from '../gameConfig.js';
+import { RECIPES } from '../GameConfig.js';
 
 export default class MergeSystem {
     constructor() {}

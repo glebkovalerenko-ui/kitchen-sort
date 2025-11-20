@@ -1,7 +1,7 @@
 // /src/scenes/GameScene.js
 
 import Phaser from 'phaser';
-import { TILE_TYPES, GENERATORS } from '../gameConfig.js';
+import { TILE_TYPES, GENERATORS } from '../GameConfig.js';
 import { dataManager } from '../DataManager.js';
 import GridManager from '../systems/GridManager.js';
 import MergeSystem from '../systems/MergeSystem.js';
@@ -13,9 +13,9 @@ export default class GameScene extends Phaser.Scene {
     }
 
     init(data) {
-        this.shouldContinue = data.continueGame || false;
-        this.savedGridState = data.gridState || null;
-        this.initialScore = data.score || 0;
+        this.shouldContinueFromGameOver = data.continueGame || false;
+        this.gridStateFromGameOver = data.gridState || null;
+        this.scoreFromGameOver = data.score || 0;
         this.events.on('resume', this.onSceneResume, this);
     }
 
@@ -26,7 +26,7 @@ export default class GameScene extends Phaser.Scene {
         this.CELL_SIZE = 100;
         this.GRID_START_X = (this.game.config.width - (this.GRID_COLS * this.CELL_SIZE)) / 2;
         this.GRID_START_Y = (this.game.config.height - (this.GRID_ROWS * this.CELL_SIZE)) / 2;
-        this.score = this.initialScore;
+        this.score = 0;
         this.ingredientsGroup = this.add.group();
         
         this.sessionStartTime = Date.now();
@@ -46,15 +46,33 @@ export default class GameScene extends Phaser.Scene {
             this.sound.play('music', { loop: true, volume: 0.4 });
         }
         
-        this.scene.launch('UIScene');
-        this.events.emit('updateScore', this.score); 
-        this.createGeneratorIcons();
+        // --- ИЗМЕНЕНИЕ: НЕ ЗАПУСКАЕМ UIScene, А ПРОСТО ПЕРЕЗАПУСКАЕМ ЕГО ДАННЫЕ ---
+        this.scene.get('UIScene').events.emit('gameStart');
 
-        if (this.shouldContinue && this.savedGridState) {
-            this.restoreGrid(this.savedGridState);
+        this.createGeneratorIcons();
+        
+        if (this.shouldContinueFromGameOver && this.gridStateFromGameOver) {
+            this.score = this.scoreFromGameOver;
+            this.restoreAfterAd(this.gridStateFromGameOver);
         } else {
-            this.startNewGame();
+            const savedGrid = dataManager.getGridState();
+            const savedScore = dataManager.getScore();
+            if (savedGrid && savedGrid.length > 0) {
+                console.log('Restoring saved game state from DataManager.');
+                this.score = savedScore;
+                this.restoreGrid(savedGrid);
+            } else {
+                console.log('Starting a new game.');
+                this.startNewGame();
+            }
         }
+        this.events.emit('updateScore', this.score); 
+        this.events.emit('updateCoins', dataManager.getCoins());
+    }
+
+    updateGridSave() {
+        dataManager.setGridState(this.saveGridState());
+        dataManager.setScore(this.score);
     }
 
     handleDrop(draggedObject, gridX, gridY) {
@@ -70,11 +88,12 @@ export default class GameScene extends Phaser.Scene {
         }
         
         this.snapToGrid(draggedObject);
+        this.updateGridSave();
         this.checkGameOverConditions();
     }
 
     handleMerge(draggedObject, targetObject, recipe) {
-        this.sound.play('merge'); // ИЗМЕНЕНО: 'merge_sfx' -> 'merge'
+        this.sound.play('merge');
         
         const sourceGridPos = { x: draggedObject.getData('gridX'), y: draggedObject.getData('gridY') };
         const targetGridPos = { x: targetObject.getData('gridX'), y: targetObject.getData('gridY') };
@@ -91,7 +110,7 @@ export default class GameScene extends Phaser.Scene {
         this.events.emit('updateCoins', dataManager.getCoins());
         const isNewUnlock = dataManager.unlockIngredient(recipe.output);
         if (isNewUnlock) {
-            this.sound.play('unlock'); // ИЗМЕНЕНО: 'unlock_sfx' -> 'unlock'
+            this.sound.play('unlock');
             console.log('NEW UNLOCK:', recipe.output);
         }
 
@@ -129,6 +148,7 @@ export default class GameScene extends Phaser.Scene {
                     duration: 300,
                     ease: 'Back.easeOut',
                     onComplete: () => {
+                        this.updateGridSave();
                         this.checkGameOverConditions();
                     }
                 });
@@ -139,6 +159,7 @@ export default class GameScene extends Phaser.Scene {
     onSceneResume() {
         console.log('GameScene has resumed.');
         this.updateGeneratorIcons();
+        this.events.emit('updateCoins', dataManager.getCoins());
     }
 
     createGeneratorIcons() {
@@ -147,7 +168,7 @@ export default class GameScene extends Phaser.Scene {
         const coopIcon = this.add.image(this.GRID_START_X - 80, this.GRID_START_Y + 70, 'icon_coop').setScale(0.15).setInteractive();
         const coopChargesText = this.add.text(coopIcon.x, coopIcon.y + 80, '', iconStyle).setOrigin(0.5);
         coopIcon.on('pointerdown', () => {
-            this.sound.play('click'); // ИЗМЕНЕНО: 'click_sfx' -> 'click'
+            this.sound.play('click');
             this.scene.pause();
             this.scene.launch('GeneratorScene', { id: 'coop' });
         });
@@ -155,7 +176,7 @@ export default class GameScene extends Phaser.Scene {
         const greenhouseIcon = this.add.image(this.GRID_START_X + this.GRID_COLS * this.CELL_SIZE + 80, this.GRID_START_Y + 70, 'icon_greenhouse').setScale(0.15).setInteractive();
         const greenhouseChargesText = this.add.text(greenhouseIcon.x, greenhouseIcon.y + 80, '', iconStyle).setOrigin(0.5);
         greenhouseIcon.on('pointerdown', () => {
-            this.sound.play('click'); // ИЗМЕНЕНО: 'click_sfx' -> 'click'
+            this.sound.play('click');
             this.scene.pause();
             this.scene.launch('GeneratorScene', { id: 'greenhouse' });
         });
@@ -174,9 +195,30 @@ export default class GameScene extends Phaser.Scene {
     }
 
     startNewGame() {
+        this.score = 0;
+        dataManager.setScore(0);
         this.addCollectedItemsToGrid(TILE_TYPES.EGG, 2);
         this.addCollectedItemsToGrid(TILE_TYPES.TOMATO, 2);
-        this.checkGameOverConditions();
+        this.updateGridSave();
+    }
+    
+    clearBoard() {
+        this.sound.play('swoosh');
+        const items = this.ingredientsGroup.getChildren();
+        this.tweens.add({
+            targets: items,
+            scale: 0,
+            alpha: 0,
+            duration: 300,
+            ease: 'Power2',
+            onComplete: () => {
+                this.ingredientsGroup.clear(true, true);
+                this.gridManager.clear();
+                this.startNewGame(); 
+                this.score = 0;
+                this.events.emit('updateScore', this.score);
+            }
+        });
     }
 
     addCollectedItemsToGrid(itemType, count) {
@@ -189,17 +231,19 @@ export default class GameScene extends Phaser.Scene {
                 break;
             }
         }
+        this.updateGridSave();
         this.checkGameOverConditions();
     }
 
     triggerGameOver() {
         console.log("GAME OVER! No more moves.");
-        // Звук проигрыша убран, т.к. его нет в новом саунд-плане.
+        dataManager.clearGridState();
         const sessionDuration = Math.round((Date.now() - this.sessionStartTime) / 1000);
         const coinsEarned = dataManager.getCoinsEarnedThisSession();
         
         const currentGridState = this.saveGridState();
-        this.scene.stop('UIScene');
+        
+        // --- ИЗМЕНЕНИЕ: НЕ ОСТАНАВЛИВАЕМ UIScene ---
         this.scene.start('GameOverScene', { 
             score: this.score, 
             gridState: currentGridState,
@@ -218,8 +262,6 @@ export default class GameScene extends Phaser.Scene {
         
         if (boardIsFull || generatorsAreEmpty) {
             this.triggerGameOver();
-        } else {
-            console.log("No moves on board, but player can still add items (generators are recharging). Game continues.");
         }
     }
 
@@ -238,25 +280,18 @@ export default class GameScene extends Phaser.Scene {
         const typeCounts = {};
         for(const item of items) {
             const type = item.getData('type');
-            if(!typeCounts[type]) {
-                typeCounts[type] = [];
-            }
-            typeCounts[type].push(item);
+            if(!typeCounts[type]) typeCounts[type] = 0;
+            typeCounts[type]++;
         }
         for (const type in typeCounts) {
-            if (typeCounts[type].length >= 2) {
-                if (this.mergeSystem.findRecipe(type, type)) {
-                    return true;
-                }
+            if (typeCounts[type] >= 2) {
+                if (this.mergeSystem.findRecipe(type, type)) return true;
             }
             for (const otherType in typeCounts) {
                 if (type === otherType) continue;
-                if (this.mergeSystem.findRecipe(type, otherType)) {
-                    return true;
-                }
+                if (this.mergeSystem.findRecipe(type, otherType)) return true;
             }
         }
-        console.log('No possible moves found.');
         return false;
     }
 
@@ -280,32 +315,30 @@ export default class GameScene extends Phaser.Scene {
         gridState.forEach(item => {
             this.createIngredient(item.x, item.y, item.type);
         });
+    }
+
+    restoreAfterAd(gridState) {
+        this.restoreGrid(gridState);
 
         if (!this.gridManager.findEmptyCell()) {
-            const cellsToClear = [];
-            this.ingredientsGroup.getChildren().forEach(child => {
-                cellsToClear.push(child);
-            });
+            const cellsToClear = this.ingredientsGroup.getChildren().slice();
             Phaser.Utils.Array.Shuffle(cellsToClear);
-            for (let i = 0; i < 3; i++) {
-                if (cellsToClear[i]) {
-                    const cell = cellsToClear[i];
-                    const gridX = cell.getData('gridX');
-                    const gridY = cell.getData('gridY');
-                    this.gridManager.removeItem(gridX, gridY);
-                    cell.destroy();
-                }
+            for (let i = 0; i < 3 && i < cellsToClear.length; i++) {
+                const cell = cellsToClear[i];
+                this.gridManager.removeItem(cell.getData('gridX'), cell.getData('gridY'));
+                cell.destroy();
             }
         }
         
         for (const id in GENERATORS) {
             const state = dataManager.getGeneratorState(id);
             const capacity = dataManager.getCurrentGeneratorValue(id, 'capacity');
-            state.charges = Math.min(capacity, state.charges + 2);
+            state.charges = Math.min(capacity, state.charges + 3);
             dataManager.setGeneratorState(id, state);
         }
         dataManager.save(true);
         this.updateGeneratorIcons();
+        this.updateGridSave();
         this.checkGameOverConditions();
     }
 
@@ -330,24 +363,5 @@ export default class GameScene extends Phaser.Scene {
         const pixelX = this.GRID_START_X + gridX * this.CELL_SIZE + this.CELL_SIZE / 2;
         const pixelY = this.GRID_START_Y + gridY * this.CELL_SIZE + this.CELL_SIZE / 2;
         gameObject.setPosition(pixelX, pixelY);
-    }
-    
-    clearBoard() {
-        this.sound.play('swoosh'); // ИСПОЛЬЗУЕМ ЗВУК ПЕРЕТАСКИВАНИЯ ДЛЯ ЭФФЕКТА "СМАХИВАНИЯ"
-        
-        const items = this.ingredientsGroup.getChildren();
-        
-        this.tweens.add({
-            targets: items,
-            scale: 0,
-            alpha: 0,
-            duration: 300,
-            ease: 'Power2',
-            onComplete: () => {
-                this.ingredientsGroup.clear(true, true);
-                this.gridManager.clear();
-                this.checkGameOverConditions();
-            }
-        });
     }
 }

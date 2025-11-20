@@ -1,5 +1,5 @@
 // /src/systems/GridManager.js
-import { TILE_TYPES } from '../gameConfig.js';
+import { TILE_TYPES } from '../GameConfig.js';
 
 export default class GridManager {
     constructor(scene) {

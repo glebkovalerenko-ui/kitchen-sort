@@ -1,4 +1,4 @@
-// /src/YandexSDKMock.js
+// /public/YandexSDKMock.js
 // Это "заглушка" для Yandex Games SDK, чтобы игра работала локально.
 
 console.warn('YANDEX SDK MOCK IS RUNNING!');
@@ -74,10 +74,9 @@ const leaderboardMock = {
             getRank: () => 10
         });
     },
-    // ДОБАВЛЕН МЕТОД ДЛЯ ОТКРЫТИЯ UI
     openLeaderboard: function(leaderboardName) {
         console.log(`[MOCK SDK] Leaderboard.openLeaderboard called for board: '${leaderboardName}'.`);
-        alert(`[MOCK] Открыта таблица лидеров: '${leaderboardName}'`); // Показываем alert для наглядности
+        alert(`[MOCK] Открыта таблица лидеров: '${leaderboardName}'`);
         return Promise.resolve();
     }
 };
@@ -89,7 +88,18 @@ window.YaGames = {
         return Promise.resolve({
             adv: advMock,
             metrica: metricaMock,
-            features: { Leaderboards: { isFeatureAvailable: true } }, // Говорим, что фича всегда доступна локально
+            features: { 
+                Leaderboards: { isFeatureAvailable: true },
+                LoadingAPI: { ready: () => console.log('[MOCK SDK] LoadingAPI.ready() called.') }
+            },
+            // <-- ВОТ ИСПРАВЛЕНИЕ: ДОБАВЛЕН НЕДОСТАЮЩИЙ ОБЪЕКТ -->
+            environment: {
+                i18n: {
+                    lang: 'ru' // Имитируем русский язык по умолчанию для локального теста
+                },
+                payload: null // Добавляем на всякий случай, чтобы избежать других ошибок
+            },
+            // <-- КОНЕЦ ИСПРАВЛЕНИЯ -->
             getPlayer: () => {
                 console.log('[MOCK SDK] ysdk.getPlayer called.');
                 return localStorageMock.init();

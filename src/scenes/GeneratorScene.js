@@ -1,8 +1,9 @@
 // /src/scenes/GeneratorScene.js
 import Phaser from 'phaser';
-import { GENERATORS, GREENHOUSE_SLOTS, COOP_SLOTS } from '../gameConfig.js';
+import { GENERATORS, GREENHOUSE_SLOTS, COOP_SLOTS } from '../GameConfig.js';
 import { dataManager } from '../DataManager.js';
 import { adManager } from '../AdManager.js';
+import { localizationManager } from '../LocalizationManager.js'; // <-- ИМПОРТ
 
 export default class GeneratorScene extends Phaser.Scene {
     constructor() {
@@ -58,30 +59,26 @@ export default class GeneratorScene extends Phaser.Scene {
     createUI() {
         const textStyle = { fontSize: '28px', fill: '#ffffff', stroke: '#000000', strokeThickness: 5 };
 
-        // --- ВЕРХНЯЯ ПАНЕЛЬ ---
         this.add.text(this.game.config.width / 2, 60, this.config.name, { fontSize: '48px', fill: '#ffffff', stroke: '#333333', strokeThickness: 6 }).setOrigin(0.5);
         const backBtn = this.add.image(80, 60, 'button').setScale(0.7).setInteractive();
-        this.add.text(backBtn.x, backBtn.y, 'Назад', { fontSize: '24px', fill: '#000' }).setOrigin(0.5);
+        this.add.text(backBtn.x, backBtn.y, localizationManager.getString('btn_back'), { fontSize: '24px', fill: '#000' }).setOrigin(0.5);
         backBtn.on('pointerdown', () => {
             this.sound.play('click');
             this.scene.resume('GameScene');
             this.scene.stop();
         });
 
-        // ИНФОРМАЦИЯ ПЕРЕМЕЩЕНА НАВЕРХ
         this.chargesText = this.add.text(this.game.config.width / 2, 120, '', textStyle).setOrigin(0.5);
         this.timerText = this.add.text(this.game.config.width / 2, 155, '', textStyle).setOrigin(0.5);
 
-        // --- НИЖНЯЯ ПАНЕЛЬ ---
         const uiPanelY = this.game.config.height - 80;
 
-        // КНОПКИ РАЗНЕСЕНЫ ПО СТОРОНАМ
         this.collectBtn = this.add.image(this.game.config.width / 4 + 50, uiPanelY, 'button').setScale(1.2).setInteractive();
-        this.add.text(this.collectBtn.x, this.collectBtn.y, 'Собрать', { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+        this.add.text(this.collectBtn.x, this.collectBtn.y, localizationManager.getString('btn_collect'), { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
         this.collectBtn.on('pointerdown', this.onCollectClicked, this);
 
         const upgradeBtn = this.add.image(this.game.config.width * 3 / 4 - 50, uiPanelY, 'button').setScale(1.2).setInteractive();
-        this.add.text(upgradeBtn.x, upgradeBtn.y, 'Улучшить', { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+        this.add.text(upgradeBtn.x, upgradeBtn.y, localizationManager.getString('btn_upgrade'), { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
         upgradeBtn.on('pointerdown', () => {
              this.sound.play('click');
              this.showUpgradePanel();
@@ -89,7 +86,7 @@ export default class GeneratorScene extends Phaser.Scene {
     }
 
     onCollectClicked() {
-        this.sound.play('click'); // ИЗМЕНЕНО
+        this.sound.play('click');
         const state = dataManager.getGeneratorState(this.generatorId);
         const chargesToCollect = state.charges;
 
@@ -109,7 +106,7 @@ export default class GeneratorScene extends Phaser.Scene {
 
     showUpgradePanel() {
         if (this.upgradePanel) {
-            this.refreshAllDisplays();
+            this.refreshUpgradePanel();
             return;
         }
 
@@ -124,8 +121,9 @@ export default class GeneratorScene extends Phaser.Scene {
         panelBG.lineStyle(2, 0xffffff, 1);
         panelBG.fillRoundedRect(-350, -280, 700, 560, 16);
         this.upgradePanel.add(panelBG);
-
-        this.upgradePanel.add(this.add.text(0, -240, `Улучшения: ${this.config.name}`, { fontSize: '32px', fill: '#fff' }).setOrigin(0.5));
+        
+        const panelTitle = localizationManager.getString('upgrade_panel_title', { generatorName: this.config.name });
+        this.upgradePanel.add(this.add.text(0, -240, panelTitle, { fontSize: '32px', fill: '#fff' }).setOrigin(0.5));
         
         const closeBtn = this.add.text(320, -250, 'X', { fontSize: '32px', fill: '#ff0000' }).setOrigin(0.5).setInteractive();
         closeBtn.on('pointerdown', this.hideUpgradePanel, this);
@@ -138,11 +136,15 @@ export default class GeneratorScene extends Phaser.Scene {
             this.createUpgradeRow(type, yPos);
         });
         
+        // --- УЛУЧШЕНИЕ UX РЕКЛАМЫ ---
         const boostBtn = this.add.image(0, 180, 'button').setScale(1.2).setInteractive();
-        const boostBtnText = this.add.text(boostBtn.x, boostBtn.y, 'Бонус (Ad)', { fontSize: '28px', fill: '#000' }).setOrigin(0.5);
+        const boostBtnText = this.add.text(boostBtn.x, boostBtn.y, localizationManager.getString('generator_boost_ad_reward'), { fontSize: '28px', fill: '#000' }).setOrigin(0.5);
         this.upgradePanel.add([boostBtn, boostBtnText]);
         boostBtn.on('pointerdown', () => {
-            this.sound.play('click'); // ИЗМЕНЕНО
+            this.sound.play('click');
+            boostBtn.disableInteractive().setTint(0x888888);
+            boostBtnText.setText(localizationManager.getString('ui_loading'));
+
             adManager.showRewarded(this, 'rewarded_generator_boost', {
                 onRewarded: () => {
                     const state = dataManager.getGeneratorState(this.generatorId);
@@ -150,20 +152,29 @@ export default class GeneratorScene extends Phaser.Scene {
                     state.charges = Math.min(capacity, state.charges + 1);
                     dataManager.setGeneratorState(this.generatorId, state);
                     dataManager.save(true);
-                    this.refreshAllDisplays();
+                    this.refreshAllDisplays(); // Обновляем основную сцену
+                    
+                    // Прямо здесь обновляем состояние кнопки
+                    boostBtn.setInteractive().clearTint();
+                    boostBtnText.setText(localizationManager.getString('generator_boost_ad_reward'));
                 },
                 onError: () => {
-                    boostBtnText.setText('Ошибка');
-                    boostBtn.disableInteractive().setTint(0x888888);
+                    boostBtnText.setText(localizationManager.getString('btn_ad_error'));
+                },
+                onClose: () => {
+                    if (boostBtn.active) {
+                       boostBtn.setInteractive().clearTint();
+                       boostBtnText.setText(localizationManager.getString('generator_boost_ad_reward'));
+                    }
                 }
             });
         });
 
-        this.refreshAllDisplays();
+        this.refreshUpgradePanel();
     }
 
     hideUpgradePanel() {
-        this.sound.play('click'); // ИЗМЕНЕНО
+        this.sound.play('click');
         if (this.upgradePanel) {
             this.upgradePanel.destroy();
             this.upgradePanel = null;
@@ -180,19 +191,15 @@ export default class GeneratorScene extends Phaser.Scene {
         };
         
         row.button.on('pointerdown', () => {
-            this.sound.play('click'); // ИЗМЕНЕНО
+            this.sound.play('click');
             const success = dataManager.upgradeGenerator(this.generatorId, type);
             if (success) {
-                this.refreshAllDisplays();
+                this.refreshUpgradePanel();
+                // Также обновляем текст монет на основной сцене, т.к. они изменились
+                const gameScene = this.scene.get('GameScene');
+                gameScene.events.emit('updateCoins', dataManager.getCoins());
             } else {
-                this.tweens.add({
-                    targets: row.button,
-                    x: row.button.x + 10,
-                    duration: 50,
-                    ease: 'Power1',
-                    yoyo: true,
-                    repeat: 2
-                });
+                this.tweens.add({ targets: row.button, x: row.button.x + 10, duration: 50, ease: 'Power1', yoyo: true, repeat: 2 });
             }
         });
         
@@ -203,7 +210,7 @@ export default class GeneratorScene extends Phaser.Scene {
     refreshAllDisplays() {
         const state = dataManager.getGeneratorState(this.generatorId);
         const capacity = dataManager.getCurrentGeneratorValue(this.generatorId, 'capacity');
-        this.chargesText.setText(`Готово: ${state.charges} / ${capacity}`);
+        this.chargesText.setText(`${localizationManager.getString('generator_header')} ${state.charges} / ${capacity}`);
         
         if (state.charges > 0) {
             this.collectBtn.setAlpha(1).setInteractive();
@@ -230,19 +237,25 @@ export default class GeneratorScene extends Phaser.Scene {
         }
 
         if (this.upgradePanel && this.upgradePanel.active) {
-            for (const type in this.upgradeRows) {
-                const row = this.upgradeRows[type];
-                const level = dataManager.getGeneratorUpgradeLevel(this.generatorId, type);
-                const cost = dataManager.getGeneratorUpgradeCost(this.generatorId, type);
-                
-                row.level.setText(`Ур. ${level} -> ${level + 1}`);
-                row.costText.setText(`${cost}`);
-                
-                if (dataManager.getCoins() < cost) {
-                    row.button.setTint(0x888888);
-                } else {
-                    row.button.clearTint();
-                }
+            this.refreshUpgradePanel();
+        }
+    }
+
+    refreshUpgradePanel() {
+        if (!this.upgradePanel || !this.upgradePanel.active) return;
+        
+        for (const type in this.upgradeRows) {
+            const row = this.upgradeRows[type];
+            const level = dataManager.getGeneratorUpgradeLevel(this.generatorId, type);
+            const cost = dataManager.getGeneratorUpgradeCost(this.generatorId, type);
+            
+            row.level.setText(`${localizationManager.getString('gadget_level', {level: level})} -> ${level + 1}`);
+            row.costText.setText(`${cost}`);
+            
+            if (dataManager.getCoins() < cost) {
+                row.button.setTint(0x888888).disableInteractive();
+            } else {
+                row.button.clearTint().setInteractive();
             }
         }
     }
@@ -251,7 +264,7 @@ export default class GeneratorScene extends Phaser.Scene {
         const state = dataManager.getGeneratorState(this.generatorId);
         const capacity = dataManager.getCurrentGeneratorValue(this.generatorId, 'capacity');
         if (state.charges >= capacity) {
-            this.timerText.setText('Готово к сбору!');
+            this.timerText.setText(localizationManager.getString('generator_timer_ready'));
             return;
         }
         const cooldown = dataManager.getCurrentGeneratorValue(this.generatorId, 'speed');
@@ -259,6 +272,6 @@ export default class GeneratorScene extends Phaser.Scene {
         const timeRemaining = Math.max(0, cooldown - timePassed);
         const minutes = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
         const seconds = Math.floor(timeRemaining % 60).toString().padStart(2, '0');
-        this.timerText.setText(`Следующий через: ${minutes}:${seconds}`);
+        this.timerText.setText(`${localizationManager.getString('generator_timer_next')} ${minutes}:${seconds}`);
     }
 }
