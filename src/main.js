@@ -24,7 +24,8 @@ const config = {
 
 const game = new Phaser.Game(config);
 
-game.canvas.oncontextmenu = (e) => e.preventDefault();
+// ИЗМЕНЕНИЕ: Эта строка была удалена, так как обработка теперь происходит в index.html
+// game.canvas.oncontextmenu = (e) => e.preventDefault();
 
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
