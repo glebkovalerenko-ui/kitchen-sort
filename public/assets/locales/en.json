@@ -47,6 +47,7 @@
     "upgrade_capacity_name_greenhouse": "New Bush",
     "upgrade_speed_name_greenhouse": "Watering System",
     "upgrade_bonus_name_greenhouse": "Fertilizers",
-    "continue_reward_desc": "Restore the board and get +3 charges",
-    "generator_boost_desc": "Instantly get 1 extra charge"
+    "continue_reward_desc": "Continue playing! Get +3 🥚 and +3 🍅 to beat your high score.",
+    "generator_boost_desc_coop": "Instantly get 1 Egg",
+    "generator_boost_desc_greenhouse": "Instantly get 1 Tomato"
 }

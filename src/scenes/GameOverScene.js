@@ -70,10 +70,12 @@ export default class GameOverScene extends Phaser.Scene {
             this.scene.start('GameScene');
         });
 
-        const continueRewardDesc = this.add.text(this.game.config.width / 2, 630, localizationManager.getString('continue_reward_desc'), { fontSize: '22px', fill: '#90ee90', align: 'center' }).setOrigin(0.5);
+        // --- ИЗМЕНЕНИЕ: Добавляем перенос строк и выравнивание ---
+        const continueRewardDescStyle = { fontSize: '22px', fill: '#90ee90', align: 'center', wordWrap: { width: 700 } };
+        const continueRewardDesc = this.add.text(this.game.config.width / 2, 640, localizationManager.getString('continue_reward_desc'), continueRewardDescStyle).setOrigin(0.5);
         
-        // --- ИЗМЕНЕНИЕ: УВЕЛИЧИВАЕМ РАЗМЕР КНОПКИ, АНАЛОГИЧНО КНОПКЕ "УДВОИТЬ" ---
-        const continueBtn = this.add.image(this.game.config.width / 2, 710, 'button').setOrigin(0.5).setScale(1.2).setInteractive();
+        // --- ИЗМЕНЕНИЕ: Смещаем кнопку чуть ниже, чтобы учесть возможный перенос текста ---
+        const continueBtn = this.add.image(this.game.config.width / 2, 730, 'button').setOrigin(0.5).setScale(1.2).setInteractive();
         
         const continueText = this.add.text(continueBtn.x, continueBtn.y, localizationManager.getString('btn_continue_ad_short'), { fontSize: '28px', fill: '#000' }).setOrigin(0.5);
         

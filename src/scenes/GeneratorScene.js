@@ -137,12 +137,14 @@ export default class GeneratorScene extends Phaser.Scene {
             this.createUpgradeRow(type, yPos);
         });
         
-        // --- Финальные, возвращенные на место позиции ---
-        const boostDesc = this.add.text(0, 130, localizationManager.getString('generator_boost_desc'), { fontSize: '20px', fill: '#90ee90', align: 'center' }).setOrigin(0.5);
+        // --- ИЗМЕНЕНИЕ: Динамическое формирование ключа для описания награды ---
+        const descKey = `generator_boost_desc_${this.generatorId}`;
+        const boostDescText = localizationManager.getString(descKey);
+        const boostDesc = this.add.text(0, 130, boostDescText, { fontSize: '20px', fill: '#90ee90', align: 'center' }).setOrigin(0.5);
+        
         const boostBtn = this.add.image(0, 210, 'button').setScale(1.2).setInteractive();
         const boostBtnText = this.add.text(boostBtn.x, boostBtn.y, localizationManager.getString('generator_boost_ad_reward'), { fontSize: '28px', fill: '#000' }).setOrigin(0.5);
         
-        // --- Кнопка "Назад" остается внизу, с большим отступом ---
         const backBtn = this.add.image(0, 340, 'button').setInteractive();
         const backBtnText = this.add.text(backBtn.x, backBtn.y, localizationManager.getString('btn_back'), { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
         backBtn.on('pointerdown', this.hideUpgradePanel, this);
