@@ -35,7 +35,8 @@ export default class GameOverScene extends Phaser.Scene {
             console.error('Leaderboard error:', err);
         }
 
-        this.time.delayedCall(500, () => adManager.showInterstitial(this));
+        // --- ИЗМЕНЕНИЕ: Убран delayedCall для немедленного показа рекламы ---
+        adManager.showInterstitial(this);
 
         const doubleInfoText = this.add.text(this.game.config.width / 2, 330, localizationManager.getString('double_reward_info', { coins: this.coinsEarned }), { fontSize: '28px', fill: '#90ee90' }).setOrigin(0.5);
         const doubleCoinsBtn = this.add.image(this.game.config.width / 2, 430, 'button').setScale(1.2).setInteractive();

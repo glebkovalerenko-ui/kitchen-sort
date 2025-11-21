@@ -1,6 +1,6 @@
 // /src/DataManager.js
 
-import { GADGETS, GENERATORS } from './GameConfig.js';
+import { GADGETS, GENERATORS, INTERSTITIAL_FIRST_SESSION_DELAY } from './GameConfig.js';
 import { analyticsManager } from './AnalyticsManager.js';
 
 const SAVE_KEY = 'playerData';
@@ -41,17 +41,19 @@ class DataManager {
             const data = await this.player.getData([SAVE_KEY]);
             if (data && data[SAVE_KEY]) {
                 this.playerData = data[SAVE_KEY];
+                
                 // --- ОБРАБОТКА ДЛЯ СОВМЕСТИМОСТИ СТАРЫХ СОХРАНЕНИЙ ---
-                if (this.playerData.savedGrid === undefined) {
-                    this.playerData.savedGrid = null;
+                if (!this.playerData.savedGrid) this.playerData.savedGrid = null;
+                if (!this.playerData.score) this.playerData.score = 0;
+                if (!this.playerData.lastInterstitialShowTimestamp) this.playerData.lastInterstitialShowTimestamp = 0;
+                
+                // --- НОВОЕ: Проверка и установка метки времени первого запуска ---
+                if (!this.playerData.firstPlayTimestamp) {
+                    this.playerData.firstPlayTimestamp = Date.now();
+                    console.log(`First play detected. Timestamp set to: ${this.playerData.firstPlayTimestamp}`);
+                    await this.save(true); // Сохраняем немедленно
                 }
-                if (this.playerData.score === undefined) {
-                    this.playerData.score = 0;
-                }
-                // --- ДОБАВЛЕНА ОБРАБОТКА ДЛЯ НОВОГО ПОЛЯ РЕКЛАМЫ ---
-                if (this.playerData.lastInterstitialShowTimestamp === undefined) {
-                    this.playerData.lastInterstitialShowTimestamp = 0;
-                }
+                
                 console.log('Player data loaded from cloud:', this.playerData);
             } else {
                 console.log('No data in cloud. Using default data.');
@@ -67,9 +69,7 @@ class DataManager {
     markDirty() {
         this.isDataDirty = true;
         
-        if (this.saveTimeout) {
-            clearTimeout(this.saveTimeout);
-        }
+        if (this.saveTimeout) clearTimeout(this.saveTimeout);
 
         this.saveTimeout = setTimeout(() => {
             this.save(true);
@@ -77,13 +77,8 @@ class DataManager {
     }
     
     async save(flush = false) {
-        if (!this.isDataDirty && flush === false) {
-            return;
-        }
-        if (!this.player) {
-            console.error('Cannot save data: Player object is not initialized.');
-            return;
-        }
+        if (!this.isDataDirty && flush === false) return;
+        if (!this.player) return;
 
         try {
             await this.player.setData({ [SAVE_KEY]: this.playerData }, flush);
@@ -101,27 +96,34 @@ class DataManager {
     // --- УПРАВЛЕНИЕ РЕКЛАМОЙ ---
     canShowInterstitial() {
         const now = Date.now();
+
+        // --- НОВОЕ: Проверка "медового месяца" ---
+        const firstPlayTimestamp = this.playerData.firstPlayTimestamp || 0;
+        if (now - firstPlayTimestamp < INTERSTITIAL_FIRST_SESSION_DELAY) {
+            console.log(`[AdManager] Interstitial Ad request skipped due to first session grace period.`);
+            return false;
+        }
+
+        // Старая проверка кулдауна
         const lastShown = this.playerData.lastInterstitialShowTimestamp || 0;
-        const canShow = (now - lastShown) > INTERSTITIAL_COOLDOWN;
-        console.log(`[AdManager] Checking Interstitial Cooldown. Can show: ${canShow}`);
-        return canShow;
+        if (now - lastShown < INTERSTITIAL_COOLDOWN) {
+            console.log(`[AdManager] Interstitial Ad request skipped due to 90s cooldown.`);
+            return false;
+        }
+
+        return true;
     }
 
     recordInterstitialShow() {
         this.playerData.lastInterstitialShowTimestamp = Date.now();
-        this.save(true); // Немедленное сохранение
+        this.save(true);
         console.log(`[AdManager] Interstitial timestamp recorded: ${this.playerData.lastInterstitialShowTimestamp}`);
     }
 
     // --- УПРАВЛЕНИЕ ЗВУКОМ ---
-    isMuted() {
-        return this.playerData.settings?.isMuted ?? false;
-    }
-
+    isMuted() { return this.playerData.settings?.isMuted ?? false; }
     setMuted(isMuted) {
-        if (!this.playerData.settings) {
-            this.playerData.settings = {};
-        }
+        if (!this.playerData.settings) this.playerData.settings = {};
         this.playerData.settings.isMuted = isMuted;
         this.save(true);
     }
@@ -136,20 +138,15 @@ class DataManager {
         }
         return false;
     }
-    
-    isUnlocked(type) {
-        return this.playerData.unlockedItems.includes(type);
-    }
+    isUnlocked(type) { return this.playerData.unlockedItems.includes(type); }
 
     // --- УПРАВЛЕНИЕ ВАЛЮТОЙ И ОЧКАМИ ---
     getCoins() { return this.playerData.coins; }
-    
     addCoins(amount) {
         this.playerData.coins += amount;
         this.coinsEarnedThisSession += amount;
         this.markDirty();
     }
-
     removeCoins(amount) {
         if (this.playerData.coins >= amount) {
             this.playerData.coins -= amount;
@@ -158,11 +155,7 @@ class DataManager {
         }
         return false;
     }
-    
-    getCoinsEarnedThisSession() {
-        return this.coinsEarnedThisSession;
-    }
-
+    getCoinsEarnedThisSession() { return this.coinsEarnedThisSession; }
     getScore() { return this.playerData.score; }
     setScore(score) {
         this.playerData.score = score;
@@ -178,20 +171,16 @@ class DataManager {
     clearGridState() {
         this.playerData.savedGrid = null;
         this.playerData.score = 0;
-        this.save(true); // Немедленно сохраняем, чтобы при обновлении не загрузилась старая игра
+        this.save(true);
     }
 
     // --- УПРАВЛЕНИЕ ГАДЖЕТАМИ ---
-    getGadgetLevel(gadgetId) {
-        return this.playerData.gadgets[gadgetId + 'Level'] ?? 0;
-    }
-
+    getGadgetLevel(gadgetId) { return this.playerData.gadgets[gadgetId + 'Level'] ?? 0; }
     getGadgetUpgradeCost(gadgetId) {
         const gadget = GADGETS[gadgetId];
         const level = this.getGadgetLevel(gadgetId);
         return Math.floor(gadget.baseCost * Math.pow(gadget.costFactor, level));
     }
-
     upgradeGadget(gadgetId) {
         const cost = this.getGadgetUpgradeCost(gadgetId);
         if (this.removeCoins(cost)) {
@@ -208,33 +197,25 @@ class DataManager {
     getGeneratorState(generatorId) {
         if (!this.playerData.generators[generatorId]) {
             this.playerData.generators[generatorId] = {
-                charges: 4,
-                lastChargeTimestamp: Date.now(),
-                capacityLevel: 0,
-                speedLevel: 0,
-                bonusLevel: 0
+                charges: 4, lastChargeTimestamp: Date.now(),
+                capacityLevel: 0, speedLevel: 0, bonusLevel: 0
             };
             this.markDirty();
         }
         return this.playerData.generators[generatorId];
     }
-    
     setGeneratorState(generatorId, state) {
         this.playerData.generators[generatorId] = state;
         this.markDirty();
     }
-
     getGeneratorUpgradeLevel(generatorId, upgradeType) {
-        const state = this.getGeneratorState(generatorId);
-        return state[upgradeType + 'Level'];
+        return this.getGeneratorState(generatorId)[upgradeType + 'Level'];
     }
-
     getGeneratorUpgradeCost(generatorId, upgradeType) {
         const config = GENERATORS[generatorId].upgrades[upgradeType];
         const level = this.getGeneratorUpgradeLevel(generatorId, upgradeType);
         return Math.floor(config.baseCost * Math.pow(config.factor, level));
     }
-    
     getCurrentGeneratorValue(generatorId, upgradeType) {
         const config = GENERATORS[generatorId].upgrades[upgradeType];
         const level = this.getGeneratorUpgradeLevel(generatorId, upgradeType);
@@ -244,7 +225,6 @@ class DataManager {
             return config.baseValue + (config.increment * level);
         }
     }
-
     upgradeGenerator(generatorId, upgradeType) {
         const cost = this.getGeneratorUpgradeCost(generatorId, upgradeType);
         if (this.removeCoins(cost)) {
@@ -264,7 +244,8 @@ class DataManager {
             score: 0,
             unlockedItems: ['egg', 'tomato'],
             savedGrid: null,
-            lastInterstitialShowTimestamp: 0, // <-- НОВОЕ ПОЛЕ
+            lastInterstitialShowTimestamp: 0,
+            firstPlayTimestamp: Date.now(), // --- НОВОЕ: Устанавливаем при создании данных
             gadgets: {
                 knifeLevel: 0,
                 spatulaLevel: 0

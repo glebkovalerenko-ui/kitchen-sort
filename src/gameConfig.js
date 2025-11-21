@@ -87,3 +87,6 @@ export const COOP_SLOTS = [
 ];
 
 export const CLEAR_BOARD_COST = 250;
+
+// --- НОВОЕ: Конфигурация для "медового месяца" ---
+export const INTERSTITIAL_FIRST_SESSION_DELAY = 600000; // 600 секунд = 10 минут в миллисекундах
