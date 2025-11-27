@@ -19,8 +19,12 @@ export default class GeneratorScene extends Phaser.Scene {
     }
 
     create() {
+        // --- ФОН И БЛОКИРОВКА ВВОДА ---
         const bg = this.add.image(this.game.config.width / 2, this.game.config.height / 2, `background_${this.generatorId}`);
         bg.setDisplaySize(this.game.config.width, this.game.config.height);
+        
+        // ВАЖНО: Делаем фон интерактивным, чтобы клики не проходили сквозь него на GameScene
+        bg.setInteractive(); 
 
         for (const slot of this.slotData) {
             const sprite = this.add.sprite(slot.x, slot.y, 'placeholder').setScale(slot.scale).setVisible(false);
@@ -64,6 +68,7 @@ export default class GeneratorScene extends Phaser.Scene {
         
         const backBtn = this.add.image(80, 60, 'button').setScale(0.7).setInteractive();
         this.add.text(backBtn.x, backBtn.y, localizationManager.getString('btn_back'), { fontSize: '24px', fill: '#000' }).setOrigin(0.5);
+        
         backBtn.on('pointerdown', () => {
             this.sound.play('click');
             this.scene.resume('GameScene');
@@ -118,7 +123,9 @@ export default class GeneratorScene extends Phaser.Scene {
         this.upgradePanel = this.add.container(this.game.config.width / 2, this.game.config.height / 2);
         this.upgradePanel.setDepth(10);
 
+        // --- БЛОКИРОВКА КЛИКОВ ПОД ПАНЕЛЬЮ ---
         const overlay = this.add.rectangle(0, 0, this.game.config.width, this.game.config.height, 0x000000, 0.7).setInteractive();
+        overlay.on('pointerdown', () => { /* Absorbs clicks */ }); // Явно перехватываем клик
         
         const panelBG = this.add.graphics().fillStyle(0x333333, 1).lineStyle(2, 0xffffff, 1).fillRoundedRect(-PANEL_WIDTH / 2, -PANEL_HEIGHT / 2, PANEL_WIDTH, PANEL_HEIGHT, 16);
         
@@ -137,11 +144,11 @@ export default class GeneratorScene extends Phaser.Scene {
             this.createUpgradeRow(type, yPos);
         });
         
-        // --- ИЗМЕНЕНИЕ: Динамическое формирование ключа для описания награды ---
         const descKey = `generator_boost_desc_${this.generatorId}`;
         const boostDescText = localizationManager.getString(descKey);
         const boostDesc = this.add.text(0, 130, boostDescText, { fontSize: '20px', fill: '#90ee90', align: 'center' }).setOrigin(0.5);
         
+        // --- КНОПКА BOOST (РЕКЛАМА) ---
         const boostBtn = this.add.image(0, 210, 'button').setScale(1.2).setInteractive();
         const boostBtnText = this.add.text(boostBtn.x, boostBtn.y, localizationManager.getString('generator_boost_ad_reward'), { fontSize: '28px', fill: '#000' }).setOrigin(0.5);
         
@@ -153,6 +160,8 @@ export default class GeneratorScene extends Phaser.Scene {
 
         boostBtn.on('pointerdown', () => {
             this.sound.play('click');
+            
+            // Блокируем кнопку
             boostBtn.disableInteractive().setTint(0x888888);
             boostBtnText.setText(localizationManager.getString('ui_loading'));
 
@@ -160,19 +169,33 @@ export default class GeneratorScene extends Phaser.Scene {
                 onRewarded: () => {
                     const state = dataManager.getGeneratorState(this.generatorId);
                     const capacity = dataManager.getCurrentGeneratorValue(this.generatorId, 'capacity');
+                    
+                    // Добавляем заряд
                     state.charges = Math.min(capacity, state.charges + 1);
                     dataManager.setGeneratorState(this.generatorId, state);
                     dataManager.save(true);
+                    
                     this.refreshAllDisplays();
                     
-                    boostBtn.setInteractive().clearTint();
-                    boostBtnText.setText(localizationManager.getString('generator_boost_ad_reward'));
+                    // Восстанавливаем кнопку
+                    if (this.upgradePanel && boostBtn.active) {
+                        boostBtn.setInteractive().clearTint();
+                        boostBtnText.setText(localizationManager.getString('generator_boost_ad_reward'));
+                    }
                 },
                 onError: () => {
                     boostBtnText.setText(localizationManager.getString('btn_ad_error'));
+                    // Таймер восстановления кнопки
+                    this.time.delayedCall(1500, () => {
+                        if (this.upgradePanel && boostBtn.active) {
+                            boostBtn.setInteractive().clearTint();
+                            boostBtnText.setText(localizationManager.getString('generator_boost_ad_reward'));
+                        }
+                    });
                 },
                 onClose: () => {
-                    if (boostBtn.active) {
+                    // Если закрыли без награды, восстанавливаем
+                    if (this.upgradePanel && boostBtn.active) {
                        boostBtn.setInteractive().clearTint();
                        boostBtnText.setText(localizationManager.getString('generator_boost_ad_reward'));
                     }

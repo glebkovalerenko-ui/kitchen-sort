@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- ИЗМЕНЕНИЕ: Запрет зума и адаптация под мобилки -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Kitchen Sort</title>
     
     <script>
@@ -29,26 +30,38 @@
     </script>
     
     <style>
-        body { 
+        /* ИЗМЕНЕНИЕ: Полный сброс стилей для предотвращения скролла */
+        html, body { 
             margin: 0; 
-            background-color: #111; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            height: 100vh;
-            /* --- СТИЛИ ДЛЯ ОТКЛЮЧЕНИЯ ВЫДЕЛЕНИЯ --- */
-            -webkit-user-select: none; /* Safari */
-            -ms-user-select: none; /* IE 10+ */
-            user-select: none; /* Standard syntax */
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #333333; /* Цвет фона как в игре, чтобы не моргало белым */
+            overflow: hidden; /* Убирает скроллбары */
+            position: fixed;  /* Фиксирует страницу на iOS (анти-резинка) */
+            top: 0;
+            left: 0;
+            
+            /* Отключение выделения и системных меню */
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none; /* Отключает меню при долгом тапе на iOS */
         }
+        
         canvas {
+            display: block; /* Убирает отступы у inline-элементов */
             outline: none;
-            -webkit-tap-highlight-color: rgba(0,0,0,0); /* Отключает подсветку при тапе на iOS */
+            -webkit-tap-highlight-color: rgba(0,0,0,0);
+            
+            /* Сообщаем браузеру, что касания обрабатывает приложение */
+            touch-action: none; 
         }
     </style>
 </head>
-<!-- ИЗМЕНЕНИЕ: Добавлен oncontextmenu для блокировки ПКМ на всей странице -->
-<body oncontextmenu="return false;">
-    <script type="module" src="/src/Main.js"></script>
+<!-- ИЗМЕНЕНИЕ: oncontextmenu блокирует ПКМ, ondragstart блокирует перетаскивание картинок браузером -->
+<body oncontextmenu="return false;" ondragstart="return false;">
+    <script type="module" src="/src/main.js"></script>
 </body>
 </html>
