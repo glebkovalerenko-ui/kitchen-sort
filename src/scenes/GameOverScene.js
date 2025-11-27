@@ -16,41 +16,32 @@ export default class GameOverScene extends Phaser.Scene {
     }
 
     async create() {
-        // Отправляем аналитику
         analyticsManager.trackGameEnd(this.finalScore, this.sessionDuration, this.coinsEarned);
 
-        // --- UI Элементы ---
         this.add.text(this.game.config.width / 2, 150, localizationManager.getString('game_over_title'), { fontSize: '58px', fill: '#ff0000' }).setOrigin(0.5);
         this.add.text(this.game.config.width / 2, 230, localizationManager.getString('final_score') + ' ' + this.finalScore, { fontSize: '48px', fill: '#ffffff' }).setOrigin(0.5);
         this.add.text(this.game.config.width / 2, 280, localizationManager.getString('coins_earned', { coins: this.coinsEarned }), { fontSize: '32px', fill: '#ffff00' }).setOrigin(0.5);
 
-        // --- Логика Лидерборда (Safe Mode) ---
-        // Пытаемся записать рекорд, только если SDK доступен
-        if (typeof YaGames !== 'undefined') {
+        // --- Логика Лидерборда (Авто-отправка) ---
+        // Абсолютно безопасная проверка
+        if (window.ysdk && window.ysdk.features && window.ysdk.features.Leaderboards) {
             try {
-                // Используем уже инициализированный SDK, если возможно, или получаем его снова
-                const ysdk = await YaGames.init(); 
-                if (ysdk && ysdk.features && ysdk.features.Leaderboards && ysdk.features.Leaderboards.isFeatureAvailable) {
-                    const lb = await ysdk.getLeaderboards();
-                    // 'mainLeaderboard' - имя должно совпадать с консолью разработчика
-                    await lb.setLeaderboardScore('mainLeaderboard', this.finalScore);
-                    console.log('Score submitted to leaderboard');
-                }
+                // Проверяем доступность записи очков (не открываем окно, просто пишем счет)
+                // Даже если isFeatureAvailable не существует, этот блок просто пропустится, а не крашнется
+                const lb = await window.ysdk.getLeaderboards();
+                await lb.setLeaderboardScore('mainLeaderboard', this.finalScore);
+                console.log('Score submitted to leaderboard');
             } catch (err) {
-                console.warn('Leaderboard submission skipped (Offline or Error):', err);
+                console.warn('Leaderboard submission skipped:', err);
             }
         }
 
-        // --- Interstitial (Межстраничная реклама) ---
-        // AdManager сам проверит кулдауны и настройки
         adManager.showInterstitial(this);
 
-        // --- Кнопка Удвоения Монет ---
         const doubleInfoText = this.add.text(this.game.config.width / 2, 330, localizationManager.getString('double_reward_info', { coins: this.coinsEarned }), { fontSize: '28px', fill: '#90ee90' }).setOrigin(0.5);
         const doubleCoinsBtn = this.add.image(this.game.config.width / 2, 430, 'button').setScale(1.2).setInteractive();
         const doubleCoinsText = this.add.text(doubleCoinsBtn.x, doubleCoinsBtn.y, localizationManager.getString('btn_double_reward_ad'), { fontSize: '28px', fill: '#000' }).setOrigin(0.5);
         
-        // Флаг, чтобы понимать, получили ли мы уже награду
         let isDoubleRewardReceived = false;
 
         if (this.coinsEarned <= 0) {
@@ -60,8 +51,6 @@ export default class GameOverScene extends Phaser.Scene {
 
         doubleCoinsBtn.on('pointerdown', () => {
             this.sound.play('click');
-            
-            // Блокируем кнопку на время показа
             doubleCoinsBtn.disableInteractive().setTint(0x888888);
             doubleCoinsText.setText(localizationManager.getString('ui_loading'));
 
@@ -71,20 +60,14 @@ export default class GameOverScene extends Phaser.Scene {
                     dataManager.addCoins(this.coinsEarned);
                     dataManager.save(true);
                     
-                    // Обновляем UI сцены UI (если она активна/существует)
                     const uiScene = this.scene.get('UIScene');
-                    if (uiScene) {
-                        uiScene.updateCoins(dataManager.getCoins());
-                    }
+                    if (uiScene) { uiScene.updateCoins(dataManager.getCoins()); }
                     
                     doubleCoinsText.setText(localizationManager.getString('btn_reward_received'));
                     doubleInfoText.setText(localizationManager.getString('reward_received_info', {coins: this.coinsEarned}));
-                    
-                    // Кнопка остается выключенной, так как награда получена
                 },
                 onError: () => { 
                     doubleCoinsText.setText(localizationManager.getString('btn_ad_error'));
-                    // Восстанавливаем кнопку через таймер
                     this.time.delayedCall(1500, () => {
                         if (doubleCoinsBtn.active && !isDoubleRewardReceived) {
                             doubleCoinsBtn.setInteractive().clearTint();
@@ -93,7 +76,6 @@ export default class GameOverScene extends Phaser.Scene {
                     });
                 },
                 onClose: () => {
-                    // Если рекламу закрыли, но награду не получили (и не было ошибки) - восстанавливаем кнопку
                     if (!isDoubleRewardReceived && doubleCoinsBtn.active) {
                          doubleCoinsBtn.setInteractive().clearTint();
                          doubleCoinsText.setText(localizationManager.getString('btn_double_reward_ad'));
@@ -102,7 +84,6 @@ export default class GameOverScene extends Phaser.Scene {
             });
         });
         
-        // --- Кнопка Рестарт ---
         const restartBtn = this.add.image(this.game.config.width / 2, 550, 'button').setOrigin(0.5).setInteractive();
         this.add.text(restartBtn.x, restartBtn.y, localizationManager.getString('btn_restart'), { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
         restartBtn.on('pointerdown', () => { 
@@ -111,7 +92,6 @@ export default class GameOverScene extends Phaser.Scene {
             this.scene.start('GameScene');
         });
 
-        // --- Кнопка "Продолжить" (Continue) ---
         const continueRewardDescStyle = { fontSize: '22px', fill: '#90ee90', align: 'center', wordWrap: { width: 700 } };
         const continueRewardDesc = this.add.text(this.game.config.width / 2, 640, localizationManager.getString('continue_reward_desc'), continueRewardDescStyle).setOrigin(0.5);
         
@@ -130,7 +110,6 @@ export default class GameOverScene extends Phaser.Scene {
                 },
                 onError: () => {
                     continueText.setText(localizationManager.getString('btn_ad_error'));
-                    // Восстанавливаем кнопку через таймер
                     this.time.delayedCall(1500, () => {
                         if (continueBtn.active) {
                             continueBtn.setInteractive().clearTint();
@@ -139,7 +118,6 @@ export default class GameOverScene extends Phaser.Scene {
                     });
                 },
                 onClose: () => {
-                    // Если закрыли без просмотра (награда не получена - сцена не сменилась), восстанавливаем
                     if (continueBtn.active) {
                         continueBtn.setInteractive().clearTint();
                         continueText.setText(localizationManager.getString('btn_continue_ad_short'));
@@ -149,25 +127,36 @@ export default class GameOverScene extends Phaser.Scene {
         });
         
         // --- Кнопка Лидерборда (Показать таблицу) ---
-        // Показываем кнопку только если SDK загружен и фича доступна
-        if (typeof YaGames !== 'undefined') {
-             // Небольшой хак: проверяем наличие SDK асинхронно, если инициализация была быстрой
-             // Но для простоты UI: ставим кнопку, а при нажатии проверяем.
+        // Показываем кнопку только если мы уверены, что SDK загружен
+        if (window.ysdk) {
              const lbBtn = this.add.image(this.game.config.width - 80, 80, 'button').setInteractive();
              this.add.text(lbBtn.x, lbBtn.y, localizationManager.getString('leaderboard_tooltip'), { fontSize: '48px', fill: '#000' }).setOrigin(0.5);
              
              lbBtn.on('pointerdown', async () => {
                 this.sound.play('click');
-                try {
-                    const ysdk = await YaGames.init();
-                    if (ysdk.features.Leaderboards.isFeatureAvailable) {
-                        const lb = await ysdk.getLeaderboards();
-                        // Это вызывает нативное окно Яндекса
-                        // ПРИМЕЧАНИЕ: В мок-версии это alert
-                        lb.openLeaderboard('mainLeaderboard'); 
+                
+                // --- КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ БАГА ---
+                // Мы проверяем каждый шаг вручную, без optional chaining (?.), чтобы избежать TypeError
+                
+                let canOpen = false;
+                if (window.ysdk && window.ysdk.features && window.ysdk.features.Leaderboards) {
+                    if (window.ysdk.features.Leaderboards.isFeatureAvailable) {
+                        canOpen = true;
                     }
-                } catch (err) {
-                    console.warn('Leaderboard open failed:', err);
+                }
+
+                if (canOpen) {
+                    try {
+                        const lb = await window.ysdk.getLeaderboards();
+                        // Это вызывает нативное окно Яндекса
+                        lb.openLeaderboard('mainLeaderboard'); 
+                    } catch (err) {
+                        console.error('Failed to open leaderboard:', err);
+                    }
+                } else {
+                    console.warn('Leaderboards feature is missing in SDK object. SDK may be outdated in cache.');
+                    // Можно показать алерт для отладки, если хотите:
+                    // alert('Leaderboard feature not loaded yet. Try refreshing.');
                 }
              });
         }
