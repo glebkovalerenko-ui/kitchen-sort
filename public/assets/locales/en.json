@@ -49,5 +49,11 @@
     "upgrade_bonus_name_greenhouse": "Fertilizers",
     "continue_reward_desc": "Continue playing! Get +3 🥚 and +3 🍅 to beat your high score.",
     "generator_boost_desc_coop": "Instantly get 1 Egg",
-    "generator_boost_desc_greenhouse": "Instantly get 1 Tomato"
+    "generator_boost_desc_greenhouse": "Instantly get 1 Tomato",
+    "orders_panel_title": "Orders",
+    "btn_fulfill_order": "Fulfill",
+    "order_cooldown": "New order in:",
+    "order_difficulty_easy": "Easy",
+    "order_difficulty_medium": "Medium",
+    "order_difficulty_hard": "Hard"
 }

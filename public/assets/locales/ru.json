@@ -49,5 +49,11 @@
     "upgrade_bonus_name_greenhouse": "Удобрения",
     "continue_reward_desc": "Продолжить игру! Получите +3 🥚 и +3 🍅, чтобы побить свой рекорд.",
     "generator_boost_desc_coop": "Мгновенно получить 1 Яйцо",
-    "generator_boost_desc_greenhouse": "Мгновенно получить 1 Томат"
+    "generator_boost_desc_greenhouse": "Мгновенно получить 1 Томат",
+    "orders_panel_title": "Заказы",
+    "btn_fulfill_order": "Сдать",
+    "order_cooldown": "Новый заказ через:",
+    "order_difficulty_easy": "Простой",
+    "order_difficulty_medium": "Средний",
+    "order_difficulty_hard": "Сложный"
 }

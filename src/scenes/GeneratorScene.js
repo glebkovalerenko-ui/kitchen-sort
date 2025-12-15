@@ -36,27 +36,8 @@ export default class GeneratorScene extends Phaser.Scene {
     }
     
     update(time, delta) {
-        const state = dataManager.getGeneratorState(this.generatorId);
-        const capacity = dataManager.getCurrentGeneratorValue(this.generatorId, 'capacity');
-        
-        if (state.charges < capacity) {
-            const cooldown = dataManager.getCurrentGeneratorValue(this.generatorId, 'speed');
-            const now = Date.now();
-            const timePassed = (now - state.lastChargeTimestamp) / 1000;
-
-            if (timePassed >= cooldown) {
-                const chargesToAdd = Math.floor(timePassed / cooldown);
-                const newCharges = Math.min(capacity, state.charges + chargesToAdd);
-                
-                if (newCharges > state.charges) {
-                    state.charges = newCharges;
-                    state.lastChargeTimestamp += chargesToAdd * cooldown * 1000;
-                    dataManager.setGeneratorState(this.generatorId, state);
-                    this.refreshAllDisplays();
-                }
-            }
-        }
-        
+        // Логика регенерации зарядов полностью удалена и перенесена в GameScene.
+        // Здесь мы только обновляем текст таймера, который читает уже актуальные данные.
         this.updateTimerText();
     }
     
@@ -99,13 +80,16 @@ export default class GeneratorScene extends Phaser.Scene {
 
         if (chargesToCollect > 0) {
             const gameScene = this.scene.get('GameScene');
-            gameScene.addCollectedItemsToGrid(this.config.produces, chargesToCollect);
-
-            const capacity = dataManager.getCurrentGeneratorValue(this.generatorId, 'capacity');
-            if (state.charges === capacity) {
-                state.lastChargeTimestamp = Date.now();
+            
+            // Убедимся, что сцена GameScene существует и активна
+            if (gameScene) {
+                gameScene.addCollectedItemsToGrid(this.config.produces, chargesToCollect);
             }
+
+            // Сбрасываем заряды и устанавливаем новую временную метку для начала регенерации
             state.charges = 0;
+            state.lastChargeTimestamp = Date.now();
+            
             dataManager.setGeneratorState(this.generatorId, state);
             this.refreshAllDisplays();
         }

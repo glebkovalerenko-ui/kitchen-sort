@@ -1,5 +1,4 @@
 // /src/scenes/GameScene.js
-
 import Phaser from 'phaser';
 import { TILE_TYPES, GENERATORS } from '../GameConfig.js';
 import { dataManager } from '../DataManager.js';
@@ -8,6 +7,7 @@ import MergeSystem from '../systems/MergeSystem.js';
 import InputHandler from '../systems/InputHandler.js';
 
 export default class GameScene extends Phaser.Scene {
+    // ... (конструктор, init, create - без изменений)
     constructor() {
         super('GameScene');
     }
@@ -25,12 +25,12 @@ export default class GameScene extends Phaser.Scene {
         this.GRID_COLS = 5;
         this.CELL_SIZE = 100;
         this.GRID_START_X = (this.game.config.width - (this.GRID_COLS * this.CELL_SIZE)) / 2;
-        this.GRID_START_Y = (this.game.config.height - (this.GRID_ROWS * this.CELL_SIZE)) / 2;
+        this.GRID_START_Y = (this.game.config.height - (this.GRID_ROWS * this.CELL_SIZE)) / 2 - 50;
         this.score = 0;
         this.ingredientsGroup = this.add.group();
         
         this.sessionStartTime = Date.now();
-        // dataManager.startSessionTracking(); // <-- УДАЛЕНО ОТСЮДА
+        this.isSpawning = false;
         
         this.gridManager = new GridManager(this);
         this.mergeSystem = new MergeSystem();
@@ -46,7 +46,17 @@ export default class GameScene extends Phaser.Scene {
             this.sound.play('music', { loop: true, volume: 0.4 });
         }
         
-        this.createGeneratorIcons();
+        this.tapParticles = this.add.particles(0, 0, 'particle', {
+            speed: { min: 80, max: 200 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 0.8, end: 0 },
+            blendMode: 'ADD',
+            lifespan: 300,
+            emitting: false
+        });
+        this.tapParticles.setDepth(101);
+        
+        this.createGeneratorDock();
         
         if (this.shouldContinueFromGameOver && this.gridStateFromGameOver) {
             this.score = this.scoreFromGameOver;
@@ -55,15 +65,266 @@ export default class GameScene extends Phaser.Scene {
             const savedGrid = dataManager.getGridState();
             const savedScore = dataManager.getScore();
             if (savedGrid && savedGrid.length > 0) {
-                console.log('Restoring saved game state from DataManager.');
                 this.score = savedScore;
                 this.restoreGrid(savedGrid);
             } else {
-                console.log('Starting a new game.');
                 this.startNewGame();
             }
         }
         this.events.emit('updateScore', this.score); 
+        this.events.emit('updateCoins', dataManager.getCoins());
+    }
+
+    // ... (update, createGeneratorDock, playTapAnimation, onEnterGeneratorScene, onQuickCollect, updateGeneratorIconVisuals, onSceneResume, updateGridSave, handleDrop, handleMerge, startNewGame, clearBoard, addCollectedItemsToGrid, triggerGameOver, checkGameOverConditions, areGeneratorsEmpty, checkForPossibleMoves, saveGridState, restoreGrid, restoreAfterAd, createIngredient, snapToGrid - без изменений)
+    update(time, delta) {
+        for (const generatorId in GENERATORS) {
+            const state = dataManager.getGeneratorState(generatorId);
+            const capacity = dataManager.getCurrentGeneratorValue(generatorId, 'capacity');
+            
+            if (state.charges < capacity) {
+                const cooldown = dataManager.getCurrentGeneratorValue(generatorId, 'speed');
+                const now = Date.now();
+                const timePassed = (now - state.lastChargeTimestamp) / 1000;
+
+                if (timePassed >= cooldown) {
+                    const chargesToAdd = Math.floor(timePassed / cooldown);
+                    const newCharges = Math.min(capacity, state.charges + chargesToAdd);
+                    
+                    if (newCharges > state.charges) {
+                        state.charges = newCharges;
+                        state.lastChargeTimestamp += chargesToAdd * cooldown * 1000;
+                        dataManager.setGeneratorState(generatorId, state);
+                    }
+                }
+            }
+            this.updateGeneratorIconVisuals(generatorId);
+        }
+    }
+
+    createGeneratorDock() {
+        this.generatorIcons = {};
+        this.generatorDock = this.add.container(
+            this.game.config.width / 2,
+            this.GRID_START_Y + this.GRID_ROWS * this.CELL_SIZE + 80
+        );
+    
+        const generatorIds = Object.keys(GENERATORS);
+        const spacing = 180;
+        const startX = -((generatorIds.length - 1) * spacing) / 2;
+        const LONG_PRESS_DURATION = 600;
+        const BASE_SCALE = 0.18;
+        const INFLATED_SCALE = 0.25;
+    
+        generatorIds.forEach((id, index) => {
+            const containerX = startX + index * spacing;
+            const container = this.add.container(containerX, 0);
+            container.setData('startX', containerX);
+
+            const icon = this.add.image(0, 0, `icon_${id}`).setScale(BASE_SCALE).setInteractive();
+            icon.setData('baseScale', BASE_SCALE);
+            
+            const chargesText = this.add.text(0, 65, '', { fontSize: '28px', fill: '#fff', stroke: '#000', strokeThickness: 5 }).setOrigin(0.5);
+            const timerText = this.add.text(0, 65, '', { fontSize: '24px', fill: '#ffdd00', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setVisible(false);
+    
+            container.add([icon, chargesText, timerText]);
+            this.generatorDock.add(container);
+    
+            this.generatorIcons[id] = { container, icon, chargesText, timerText };
+    
+            let pressTimer = null;
+            let inflationTween = null;
+
+            const cancelAction = () => {
+                if (pressTimer) {
+                    pressTimer.remove();
+                    pressTimer = null;
+                }
+                if (inflationTween) {
+                    inflationTween.stop();
+                    inflationTween = null;
+                    this.tweens.add({
+                        targets: icon,
+                        scale: icon.getData('baseScale'),
+                        duration: 200,
+                        ease: 'Back.easeOut'
+                    });
+                }
+            };
+    
+            icon.on('pointerdown', () => {
+                this.tweens.killTweensOf(icon);
+                icon.setData('longPressTriggered', false);
+    
+                pressTimer = this.time.delayedCall(LONG_PRESS_DURATION, () => {
+                    icon.setData('longPressTriggered', true);
+                    this.onEnterGeneratorScene(id);
+                });
+    
+                inflationTween = this.tweens.add({
+                    targets: icon,
+                    scale: INFLATED_SCALE,
+                    duration: LONG_PRESS_DURATION,
+                    ease: 'Quad.easeOut'
+                });
+            });
+    
+            icon.on('pointerup', () => {
+                if (pressTimer && pressTimer.getRemaining() > 0) {
+                    cancelAction();
+                    this.onQuickCollect(id);
+                }
+            });
+    
+            icon.on('pointerout', () => {
+                if (pressTimer && pressTimer.getRemaining() > 0) {
+                    cancelAction();
+                }
+            });
+        });
+    }
+    
+    playTapAnimation(target, isSuccess) {
+        this.tweens.killTweensOf(target);
+        this.tweens.killTweensOf(target.parentContainer);
+
+        if (isSuccess) {
+            target.setTintFill(0xffffff);
+            this.time.delayedCall(100, () => target.clearTint());
+
+            const worldPos = new Phaser.Math.Vector2();
+            target.getWorldTransformMatrix().transformPoint(0, 0, worldPos);
+            this.tapParticles.emitParticleAt(worldPos.x, worldPos.y, 10);
+
+            this.tweens.chain({
+                targets: target,
+                tweens: [
+                    { scale: target.getData('baseScale') + 0.04, duration: 100, ease: 'Quad.easeOut' },
+                    { scale: target.getData('baseScale'), duration: 250, ease: 'Back.easeOut' }
+                ]
+            });
+        } else {
+            target.setTintFill(0xff0000);
+            this.time.delayedCall(150, () => target.clearTint());
+            
+            const startX = target.parentContainer.getData('startX');
+            target.parentContainer.x = startX;
+            
+            this.tweens.add({
+                targets: target.parentContainer,
+                x: startX + 10,
+                duration: 50,
+                ease: 'Power1',
+                yoyo: true,
+                repeat: 3
+            });
+
+            this.tweens.add({
+                targets: target,
+                scale: target.getData('baseScale'),
+                duration: 200,
+                ease: 'Quad.easeOut'
+            });
+        }
+    }
+
+    onEnterGeneratorScene(generatorId) {
+        this.sound.play('click');
+        this.scene.pause();
+        this.scene.launch('GeneratorScene', { id: generatorId });
+    }
+
+    onQuickCollect(generatorId) {
+        if (this.isSpawning) return;
+        const icon = this.generatorIcons[generatorId].icon;
+
+        const emptyCell = this.gridManager.findEmptyCell();
+        if (!emptyCell) {
+            this.playTapAnimation(icon, false);
+            return;
+        }
+
+        const state = dataManager.getGeneratorState(generatorId);
+        if (state.charges <= 0) {
+            this.playTapAnimation(icon, false);
+            return;
+        }
+        
+        this.playTapAnimation(icon, true);
+
+        const capacity = dataManager.getCurrentGeneratorValue(generatorId, 'capacity');
+        if (state.charges === capacity) {
+            state.lastChargeTimestamp = Date.now();
+        }
+        state.charges--;
+        dataManager.setGeneratorState(generatorId, state);
+
+        this.isSpawning = true;
+        
+        const itemType = GENERATORS[generatorId].produces;
+        const startPos = new Phaser.Math.Vector2();
+        icon.getWorldTransformMatrix().transformPoint(0, 0, startPos);
+
+        const tempSprite = this.add.sprite(startPos.x, startPos.y, itemType).setScale(0.5);
+        tempSprite.setDepth(100);
+
+        const targetX = this.GRID_START_X + emptyCell.x * this.CELL_SIZE + this.CELL_SIZE / 2;
+        const targetY = this.GRID_START_Y + emptyCell.y * this.CELL_SIZE + this.CELL_SIZE / 2;
+
+        this.tweens.add({
+            targets: tempSprite,
+            x: targetX,
+            y: targetY,
+            scale: (this.CELL_SIZE / tempSprite.width) * 0.9,
+            duration: 400,
+            ease: 'Cubic.easeIn',
+            onComplete: () => {
+                tempSprite.destroy();
+                this.createIngredient(emptyCell.x, emptyCell.y, itemType);
+                this.updateGridSave();
+                this.checkGameOverConditions();
+                this.isSpawning = false;
+            }
+        });
+    }
+
+    updateGeneratorIconVisuals(generatorId) {
+        const ui = this.generatorIcons[generatorId];
+        if (!ui) return;
+
+        const state = dataManager.getGeneratorState(generatorId);
+        const capacity = dataManager.getCurrentGeneratorValue(generatorId, 'capacity');
+        
+        if (state.charges > 0) {
+            ui.icon.clearTint();
+            ui.chargesText.setText(`${state.charges}/${capacity}`).setVisible(true);
+            ui.timerText.setVisible(false);
+        } else {
+            ui.icon.setTint(0x888888);
+            ui.chargesText.setVisible(false);
+            ui.timerText.setVisible(true);
+            
+            const cooldown = dataManager.getCurrentGeneratorValue(generatorId, 'speed');
+            const timePassed = (Date.now() - state.lastChargeTimestamp) / 1000;
+            const timeRemaining = Math.max(0, cooldown - timePassed);
+            const minutes = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
+            const seconds = Math.floor(timeRemaining % 60).toString().padStart(2, '0');
+            ui.timerText.setText(`${minutes}:${seconds}`);
+        }
+    }
+    
+    onSceneResume() {
+        for (const id in this.generatorIcons) {
+            const icon = this.generatorIcons[id].icon;
+            const container = this.generatorIcons[id].container;
+            
+            this.tweens.killTweensOf(icon);
+            this.tweens.killTweensOf(container);
+
+            icon.setScale(icon.getData('baseScale'));
+            container.x = container.getData('startX');
+
+            this.updateGeneratorIconVisuals(id);
+        }
         this.events.emit('updateCoins', dataManager.getCoins());
     }
 
@@ -108,7 +369,6 @@ export default class GameScene extends Phaser.Scene {
         const isNewUnlock = dataManager.unlockIngredient(recipe.output);
         if (isNewUnlock) {
             this.sound.play('unlock');
-            console.log('NEW UNLOCK:', recipe.output);
         }
 
         this.gridManager.removeItem(sourceGridPos.x, sourceGridPos.y);
@@ -153,50 +413,10 @@ export default class GameScene extends Phaser.Scene {
         });
     }
 
-    onSceneResume() {
-        console.log('GameScene has resumed.');
-        this.updateGeneratorIcons();
-        this.events.emit('updateCoins', dataManager.getCoins());
-    }
-
-    createGeneratorIcons() {
-        const iconStyle = { fontSize: '28px', fill: '#fff', stroke: '#000', strokeThickness: 5 };
-        this.generatorIcons = {};
-        const coopIcon = this.add.image(this.GRID_START_X - 80, this.GRID_START_Y + 70, 'icon_coop').setScale(0.15).setInteractive();
-        const coopChargesText = this.add.text(coopIcon.x, coopIcon.y + 80, '', iconStyle).setOrigin(0.5);
-        coopIcon.on('pointerdown', () => {
-            this.sound.play('click');
-            this.scene.pause();
-            this.scene.launch('GeneratorScene', { id: 'coop' });
-        });
-        this.generatorIcons.coop = { icon: coopIcon, text: coopChargesText };
-        const greenhouseIcon = this.add.image(this.GRID_START_X + this.GRID_COLS * this.CELL_SIZE + 80, this.GRID_START_Y + 70, 'icon_greenhouse').setScale(0.15).setInteractive();
-        const greenhouseChargesText = this.add.text(greenhouseIcon.x, greenhouseIcon.y + 80, '', iconStyle).setOrigin(0.5);
-        greenhouseIcon.on('pointerdown', () => {
-            this.sound.play('click');
-            this.scene.pause();
-            this.scene.launch('GeneratorScene', { id: 'greenhouse' });
-        });
-        this.generatorIcons.greenhouse = { icon: greenhouseIcon, text: greenhouseChargesText };
-        this.updateGeneratorIcons();
-        this.time.addEvent({ delay: 1000, callback: this.updateGeneratorIcons, callbackScope: this, loop: true });
-    }
-    
-    updateGeneratorIcons() {
-        if (!this.scene.isActive()) return;
-        for (const id in this.generatorIcons) {
-            const state = dataManager.getGeneratorState(id);
-            const capacity = dataManager.getCurrentGeneratorValue(id, 'capacity');
-            this.generatorIcons[id].text.setText(`${state.charges}/${capacity}`);
-        }
-    }
-
     startNewGame() {
         this.score = 0;
         dataManager.setScore(0);
-        // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: ОТСЧЁТ СЕССИИ НАЧИНАЕТСЯ ЗДЕСЬ ---
         dataManager.startSessionTracking();
-        // --- КОНЕЦ ИЗМЕНЕНИЯ ---
         this.addCollectedItemsToGrid(TILE_TYPES.EGG, 2);
         this.addCollectedItemsToGrid(TILE_TYPES.TOMATO, 2);
         this.updateGridSave();
@@ -227,7 +447,6 @@ export default class GameScene extends Phaser.Scene {
             if (emptyCell) {
                 this.createIngredient(emptyCell.x, emptyCell.y, itemType);
             } else {
-                console.warn('No empty space to add collected items!');
                 break;
             }
         }
@@ -236,7 +455,6 @@ export default class GameScene extends Phaser.Scene {
     }
 
     triggerGameOver() {
-        console.log("GAME OVER! No more moves.");
         this.events.emit('hideUI');
         dataManager.clearGridState();
         const sessionDuration = Math.round((Date.now() - this.sessionStartTime) / 1000);
@@ -260,7 +478,7 @@ export default class GameScene extends Phaser.Scene {
         const boardIsFull = !this.gridManager.findEmptyCell();
         const generatorsAreEmpty = this.areGeneratorsEmpty();
         
-        if (boardIsFull || generatorsAreEmpty) {
+        if (boardIsFull && generatorsAreEmpty) {
             this.triggerGameOver();
         }
     }
@@ -337,7 +555,6 @@ export default class GameScene extends Phaser.Scene {
             dataManager.setGeneratorState(id, state);
         }
         dataManager.save(true);
-        this.updateGeneratorIcons();
         this.updateGridSave();
         this.checkGameOverConditions();
     }
@@ -363,5 +580,69 @@ export default class GameScene extends Phaser.Scene {
         const pixelX = this.GRID_START_X + gridX * this.CELL_SIZE + this.CELL_SIZE / 2;
         const pixelY = this.GRID_START_Y + gridY * this.CELL_SIZE + this.CELL_SIZE / 2;
         gameObject.setPosition(pixelX, pixelY);
+    }
+
+    findItemOnGrid(itemType) {
+        const items = this.ingredientsGroup.getChildren();
+        return items.some(item => item.getData('type') === itemType);
+    }
+
+    // --- ИЗМЕНЕНИЕ: Метод был переименован и улучшен для возврата позиции ---
+    /**
+     * Находит предмет на поле и возвращает его мировые координаты.
+     * @param {string} itemType - Тип предмета.
+     * @returns {Phaser.Math.Vector2|null} - Позиция предмета или null.
+     */
+    getFulfillableItemPosition(itemType) {
+        const item = this.ingredientsGroup.getChildren().find(i => i.getData('type') === itemType);
+        if (item) {
+            return new Phaser.Math.Vector2(item.x, item.y);
+        }
+        return null;
+    }
+
+    removeItemByType(itemType) {
+        const items = this.ingredientsGroup.getChildren();
+        const itemToRemove = items.find(item => item.getData('type') === itemType);
+
+        if (itemToRemove) {
+            const gridX = itemToRemove.getData('gridX');
+            const gridY = itemToRemove.getData('gridY');
+            this.gridManager.removeItem(gridX, gridY);
+            itemToRemove.destroy();
+            this.updateGridSave();
+            return true;
+        }
+        return false;
+    }
+
+    // --- НОВЫЙ МЕТОД: Анимация полета предмета ---
+    /**
+     * @param {string} itemType - Тип предмета для анимации.
+     * @param {Phaser.Math.Vector2} startPos - Начальная позиция (из GameScene).
+     * @param {Phaser.Math.Vector2} endPos - Конечная позиция (из UIScene).
+     * @param {function} onCompleteCallback - Функция, которая вызовется по завершении.
+     */
+    playItemFlyAnimation(itemType, startPos, endPos, onCompleteCallback) {
+        // Немедленно удаляем настоящий предмет с поля
+        this.removeItemByType(itemType);
+
+        // Создаем временный спрайт для анимации
+        const tempSprite = this.add.sprite(startPos.x, startPos.y, itemType);
+        tempSprite.setScale((this.CELL_SIZE / tempSprite.width) * 0.9);
+        tempSprite.setDepth(200); // Поверх всего
+
+        this.tweens.add({
+            targets: tempSprite,
+            x: endPos.x,
+            y: endPos.y,
+            scale: 0.2, // Уменьшаем в полете
+            duration: 500, // Длительность 0.5с
+            ease: 'Cubic.easeIn',
+            onComplete: () => {
+                tempSprite.destroy();
+                onCompleteCallback();
+            }
+        });
     }
 }

@@ -1,7 +1,8 @@
 // /src/DataManager.js
 
-import { GADGETS, GENERATORS, INTERSTITIAL_FIRST_SESSION_DELAY } from './GameConfig.js';
+import { GADGETS, GENERATORS, INTERSTITIAL_FIRST_SESSION_DELAY, ORDERS_CONFIG } from './GameConfig.js';
 import { analyticsManager } from './AnalyticsManager.js';
+import OrderSystem from './systems/OrderSystem.js'; // <-- ИМПОРТ
 
 const SAVE_KEY = 'playerData';
 const INTERSTITIAL_COOLDOWN = 90000; // 90 секунд в миллисекундах
@@ -18,10 +19,10 @@ class DataManager {
         this.sessionStartCoins = 0;
         this.coinsEarnedThisSession = 0;
 
-        // --- КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ ---
-        // Флаг, подтверждающий, что мы успешно загрузили данные из облака (или убедились, что их там нет).
-        // Если false, сохранение в облако будет ЗАБЛОКИРОВАНО.
         this.isCloudSyncOk = false;
+        
+        // --- НОВОЕ: Инициализация системы заказов ---
+        this.orderSystem = new OrderSystem();
     }
     
     startSessionTracking() {
@@ -37,8 +38,6 @@ class DataManager {
 
     reset() {
         console.log("Resetting player data to default.");
-        // Сброс разрешен всегда, так как это явное действие игрока (если бы была кнопка в настройках)
-        // Но для безопасности ставим флаг true, чтобы новые данные могли записаться.
         this.playerData = this.getDefaultData();
         this.isCloudSyncOk = true; 
         this.save(true);
@@ -47,7 +46,6 @@ class DataManager {
     async load() {
         if (!this.player) {
             console.error('Cannot load: Player object is missing.');
-            // Инициализируем дефолтом, чтобы игра не крашнулась, но сохранять не будем.
             this.playerData = this.getDefaultData();
             this.isCloudSyncOk = false;
             return;
@@ -56,7 +54,6 @@ class DataManager {
         try {
             const data = await this.player.getData([SAVE_KEY]);
             
-            // Если мы здесь, значит запрос прошел успешно (даже если данных нет)
             this.isCloudSyncOk = true;
 
             if (data && data[SAVE_KEY]) {
@@ -67,32 +64,32 @@ class DataManager {
                 if (!this.playerData.score) this.playerData.score = 0;
                 if (!this.playerData.lastInterstitialShowTimestamp) this.playerData.lastInterstitialShowTimestamp = 0;
                 
-                // Проверка timestamp первого запуска
                 if (!this.playerData.firstPlayTimestamp) {
                     this.playerData.firstPlayTimestamp = Date.now();
-                    // Не сохраняем немедленно, чтобы лишний раз не дергать сеть, 
-                    // данные и так "грязные" если мы их поменяли, сохранимся при следующем действии.
                     this.markDirty(); 
+                }
+
+                // --- НОВОЕ: Проверка и создание структуры заказов для старых сохранений ---
+                if (!this.playerData.orders) {
+                    console.log('Old save detected. Initializing new Order System structure.');
+                    this.playerData.orders = this.getDefaultData().orders;
+                    this.markDirty();
                 }
                 
                 console.log('Player data loaded from cloud:', this.playerData);
             } else {
                 console.log('No data in cloud (New Player). Using default data.');
                 this.playerData = this.getDefaultData();
-                // Для нового игрока сразу сохраняем структуру
                 await this.save(true);
             }
         } catch (error) {
-            // --- КРИТИЧЕСКАЯ ОБРАБОТКА ОШИБКИ ---
             console.error('CRITICAL: Failed to load player data from cloud:', error);
-            
-            // Мы НЕ знаем, есть ли у игрока прогресс. 
-            // Чтобы он не перезаписался "нулем", блокируем сохранение.
             this.isCloudSyncOk = false;
-            
-            // Даем игроку "пустышку", чтобы игра запустилась и можно было поиграть в текущую сессию.
             this.playerData = this.getDefaultData();
         }
+        
+        // --- НОВОЕ: Генерация первоначальных заказов, если слоты пусты ---
+        this._generateInitialOrders();
     }
 
     markDirty() {
@@ -106,15 +103,9 @@ class DataManager {
     }
     
     async save(flush = false) {
-        // Если данные не менялись и не требуется принудительная запись - выходим
         if (!this.isDataDirty && flush === false) return;
-        
-        // Если нет объекта игрока - выходим
         if (!this.player) return;
 
-        // --- КРИТИЧЕСКАЯ ЗАЩИТА ---
-        // Если при загрузке была ошибка сети, мы НЕ имеем права сохранять,
-        // иначе перезапишем облачное сохранение локальной пустышкой.
         if (!this.isCloudSyncOk) {
             console.warn('SAVE BLOCKED: Cloud sync was not established successfully during load.');
             return;
@@ -130,33 +121,23 @@ class DataManager {
             }
         } catch (error) {
             console.error('Failed to save player data to cloud:', error);
-            // При ошибке сохранения мы не сбрасываем isCloudSyncOk, 
-            // так как данные у нас все еще валидные, просто сеть мигнула.
-            // Попробуем сохранить в следующий раз.
         }
     }
 
     // --- УПРАВЛЕНИЕ РЕКЛАМОЙ ---
     canShowInterstitial() {
-        // Если данные не загружены, лучше не показывать рекламу, так как мы не знаем тайминги
         if (!this.playerData) return false;
-
         const now = Date.now();
-
-        // Проверка "медового месяца"
         const firstPlayTimestamp = this.playerData.firstPlayTimestamp || 0;
         if (now - firstPlayTimestamp < INTERSTITIAL_FIRST_SESSION_DELAY) {
             console.log(`[AdManager] Interstitial Ad request skipped due to first session grace period.`);
             return false;
         }
-
-        // Проверка кулдауна
         const lastShown = this.playerData.lastInterstitialShowTimestamp || 0;
         if (now - lastShown < INTERSTITIAL_COOLDOWN) {
             console.log(`[AdManager] Interstitial Ad request skipped due to 90s cooldown.`);
             return false;
         }
-
         return true;
     }
 
@@ -242,6 +223,102 @@ class DataManager {
         this.playerData.score = 0;
         this.save(true);
     }
+    
+    // --- НОВЫЕ МЕТОДЫ: УПРАВЛЕНИЕ ЗАКАЗАМИ ---
+
+    /**
+     * Возвращает полное состояние системы заказов.
+     */
+    getOrdersState() {
+        return this.playerData?.orders;
+    }
+
+    /**
+     * Выполняет заказ, начисляет награду и запускает кулдаун.
+     * @param {string} orderId - ID заказа для выполнения.
+     * @returns {boolean} - true, если заказ успешно выполнен.
+     */
+    fulfillOrder(orderId) {
+        if (!this.playerData) return false;
+
+        const orderIndex = this.playerData.orders.activeOrders.findIndex(o => o.id === orderId);
+        const slotIndex = this.playerData.orders.orderSlots.findIndex(s => s.orderId === orderId);
+
+        if (orderIndex === -1 || slotIndex === -1) {
+            console.warn(`Order with id ${orderId} not found.`);
+            return false;
+        }
+
+        const order = this.playerData.orders.activeOrders[orderIndex];
+        
+        // Начисляем монеты
+        this.addCoins(order.coinReward);
+
+        // Убираем заказ из активных
+        this.playerData.orders.activeOrders.splice(orderIndex, 1);
+        
+        // Запускаем кулдаун в слоте
+        const cooldown = ORDERS_CONFIG.COOLDOWN_SECONDS[order.difficulty] * 1000;
+        this.playerData.orders.orderSlots[slotIndex].cooldownUntil = Date.now() + cooldown;
+        this.playerData.orders.orderSlots[slotIndex].orderId = null;
+        
+        console.log(`Order ${orderId} fulfilled. Reward: ${order.coinReward}. Slot ${slotIndex} is on cooldown.`);
+
+        this.save(true); // Принудительное сохранение
+        return true;
+    }
+
+    /**
+     * Проверяет кулдауны и генерирует новые заказы для свободных слотов.
+     * Этот метод нужно будет вызывать периодически из update-цикла UIScene.
+     */
+    updateOrderCooldowns() {
+        if (!this.playerData) return;
+
+        let changed = false;
+        const now = Date.now();
+
+        this.playerData.orders.orderSlots.forEach((slot, index) => {
+            // Если слот пуст (нет заказа и не на кулдауне)
+            if (!slot.orderId && now > slot.cooldownUntil) {
+                this._generateAndPlaceNewOrder(index);
+                changed = true;
+            }
+        });
+        
+        if (changed) {
+            this.markDirty();
+        }
+    }
+
+    /**
+     * Внутренний метод для генерации заказов при первой загрузке.
+     */
+    _generateInitialOrders() {
+        if (!this.playerData) return;
+        
+        this.playerData.orders.orderSlots.forEach((slot, index) => {
+            // Генерируем, только если слот абсолютно пуст (нет ID заказа)
+            if (!slot.orderId && Date.now() > slot.cooldownUntil) {
+                 this._generateAndPlaceNewOrder(index);
+            }
+        });
+    }
+
+    /**
+     * Внутренний хелпер для генерации и сохранения одного заказа.
+     * @param {number} slotIndex - Индекс слота для заполнения.
+     */
+    _generateAndPlaceNewOrder(slotIndex) {
+        const newOrder = this.orderSystem.generateNewOrder(this.playerData.unlockedItems);
+        if (newOrder) {
+            this.playerData.orders.activeOrders.push(newOrder);
+            this.playerData.orders.orderSlots[slotIndex].orderId = newOrder.id;
+            this.playerData.orders.orderSlots[slotIndex].cooldownUntil = 0;
+            console.log(`Generated new order ${newOrder.id} for slot ${slotIndex}`);
+        }
+    }
+
 
     // --- УПРАВЛЕНИЕ ГАДЖЕТАМИ ---
     getGadgetLevel(gadgetId) { 
@@ -270,7 +347,6 @@ class DataManager {
     // --- УПРАВЛЕНИЕ ГЕНЕРАТОРАМИ ---
     getGeneratorState(generatorId) {
         if (!this.playerData) {
-            // Возвращаем временный объект, чтобы не крашить UI, если данные не загрузились
             return { charges: 0, lastChargeTimestamp: Date.now(), capacityLevel: 0, speedLevel: 0, bonusLevel: 0 };
         }
         if (!this.playerData.generators[generatorId]) {
@@ -324,6 +400,12 @@ class DataManager {
     }
 
     getDefaultData() {
+        // --- НОВОЕ: Добавляем структуру orders ---
+        const initialSlots = [];
+        for (let i = 0; i < ORDERS_CONFIG.MAX_ACTIVE_ORDERS; i++) {
+            initialSlots.push({ orderId: null, cooldownUntil: 0 });
+        }
+
         return {
             coins: 0,
             score: 0,
@@ -338,6 +420,10 @@ class DataManager {
             generators: {},
             settings: {
                 isMuted: false
+            },
+            orders: {
+                activeOrders: [], // Массив объектов заказов
+                orderSlots: initialSlots // Состояние слотов (кулдаун и ID заказа)
             }
         };
     }

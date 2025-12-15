@@ -26,6 +26,34 @@ export const TILE_TYPES = {
     CHEF_SPECIAL: 'chef_special',
 };
 
+// --- НОВОЕ: УРОВНИ СЛОЖНОСТИ ПРЕДМЕТОВ (TIERS) ---
+// Ключевая структура для балансировки генерации заказов.
+export const ITEM_TIERS = {
+    [TILE_TYPES.EGG]: 1,
+    [TILE_TYPES.TOMATO]: 1,
+    [TILE_TYPES.FRIED_EGG]: 2,
+    [TILE_TYPES.DICED_TOMATOES]: 2,
+    [TILE_TYPES.OMELLETE]: 3,
+    [TILE_TYPES.TOMATO_SAUCE]: 3,
+    [TILE_TYPES.SCRAMBLED_EGGS]: 3,
+    [TILE_TYPES.BRUSCHETTA_TOMATO]: 3,
+    [TILE_TYPES.OMELETTE_WITH_TOMATOES]: 4,
+    [TILE_TYPES.SHAKSHUKA_BASE]: 4,
+    [TILE_TYPES.EGG_MUFFIN_BASE]: 4,
+    [TILE_TYPES.BREAKFAST_TOAST]: 4,
+    [TILE_TYPES.EGG_TOMATO_SALAD]: 4,
+    [TILE_TYPES.TOMATO_SPREAD]: 4,
+    [TILE_TYPES.STUFFED_TOMATO]: 4,
+    [TILE_TYPES.SHAKSHUKA]: 5,
+    [TILE_TYPES.ITALIAN_OMELETTE]: 5,
+    [TILE_TYPES.EGG_MUFFIN]: 5,
+    [TILE_TYPES.BREAKFAST_PLATE]: 6,
+    [TILE_TYPES.PROTEIN_PAN]: 6,
+    [TILE_TYPES.BAKED_FRITTATA]: 6,
+    [TILE_TYPES.CHEF_SPECIAL]: 7,
+};
+
+
 export const RECIPES = [
     { inputs: [TILE_TYPES.EGG, TILE_TYPES.EGG], output: TILE_TYPES.FRIED_EGG, score: 10, coins: 1 },
     { inputs: [TILE_TYPES.TOMATO, TILE_TYPES.TOMATO], output: TILE_TYPES.DICED_TOMATOES, score: 10, coins: 1 },
@@ -88,5 +116,23 @@ export const COOP_SLOTS = [
 
 export const CLEAR_BOARD_COST = 250;
 
-// --- НОВОЕ: Конфигурация для "медового месяца" ---
 export const INTERSTITIAL_FIRST_SESSION_DELAY = 600000; // 600 секунд = 10 минут в миллисекундах
+
+// --- НОВОЕ: КОНФИГУРАЦИЯ СИСТЕМЫ ЗАКАЗОВ ---
+export const ORDERS_CONFIG = {
+    MAX_ACTIVE_ORDERS: 3,
+
+    // Множитель награды относительно "стоимости" крафта предмета
+    REWARD_MULTIPLIER: {
+        EASY: 1.5,   // x1.5 от стоимости
+        MEDIUM: 2.0, // x2 от стоимости
+        HARD: 3.0,   // x3 от стоимости
+    },
+    
+    // Время перезарядки слота заказа в секундах
+    COOLDOWN_SECONDS: {
+        EASY: 180,   // 3 минуты
+        MEDIUM: 300, // 5 минут
+        HARD: 600,   // 10 минут
+    }
+};
