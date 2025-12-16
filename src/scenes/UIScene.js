@@ -14,6 +14,7 @@ export default class UIScene extends Phaser.Scene {
         this.uiContainer = this.add.container(); 
         this.isAnimatingOrder = false;
         this.gameScene = this.scene.get('GameScene'); 
+        this.trashConfirmationPanel = null;
         const textStyle = { fontSize: '24px', fill: '#ffffff', stroke: '#000000', strokeThickness: 4 };
 
         this.scoreText = this.add.text(20, 20, '', textStyle);
@@ -21,6 +22,7 @@ export default class UIScene extends Phaser.Scene {
         
         this.gameScene.events.on('updateScore', this.updateScore, this);
         this.gameScene.events.on('updateCoins', this.updateCoins, this);
+        this.gameScene.events.on('newRecipeUnlocked', this.showNewDiscoveryPopup, this);
         this.updateScore(this.gameScene.score);
         this.updateCoins(dataManager.getCoins());
         
@@ -61,17 +63,21 @@ export default class UIScene extends Phaser.Scene {
         const gameEvents = this.gameScene.events;
         gameEvents.on('hideUI', () => this.uiContainer.setVisible(false), this);
         gameEvents.on('showUI', () => this.uiContainer.setVisible(true), this);
-
+        
         this.events.on('shutdown', () => {
             gameEvents.off('updateScore', this.updateScore, this);
             gameEvents.off('updateCoins', this.updateCoins, this);
             gameEvents.off('hideUI');
             gameEvents.off('showUI');
+            gameEvents.off('newRecipeUnlocked', this.showNewDiscoveryPopup, this);
             this.orderUpdateTimer.destroy();
         });
     }
 
     createOrdersPanel() {
+        // ... (код без изменений)
+// ... (весь остальной код createOrdersPanel остается без изменений, просто вставьте его сюда)
+// ...
         const slotWidth = 160; 
         const slotHeight = 160;
         const gap = 20; 
@@ -120,11 +126,9 @@ export default class UIScene extends Phaser.Scene {
 
             const timerText = this.add.text(0, 0, '', { fontSize: '24px', fill: '#555', fontStyle: 'bold' }).setOrigin(0.5);
             
-            // ВАЖНО: Убрали setRectangleDropZone, оставили просто интерактивность для клика
             const hitArea = this.add.zone(0, 0, slotWidth, slotHeight).setInteractive();
-            hitArea.isOrderSlot = true;
-            hitArea.slotIndex = i;
-
+            hitArea.setData({ type: 'order', slotIndex: i });
+            
             slotContainer.add([bg, itemSprite, recipeContainer, rewardContainer, readyIcon, timerText, hitArea]);
             this.ordersContainer.add(slotContainer);
             
@@ -148,6 +152,9 @@ export default class UIScene extends Phaser.Scene {
     }
 
     drawOrderCardBackground(graphics, w, h, isReady) {
+        // ... (код без изменений)
+// ... (весь остальной код drawOrderCardBackground остается без изменений, просто вставьте его сюда)
+// ...
         graphics.clear();
         if (isReady) {
             graphics.fillStyle(0xE8F5E9, 1);
@@ -161,6 +168,9 @@ export default class UIScene extends Phaser.Scene {
     }
 
     updateOrders() {
+        // ... (код без изменений)
+// ... (весь остальной код updateOrders остается без изменений, просто вставьте его сюда)
+// ...
         if (this.isAnimatingOrder) return;
         dataManager.updateOrderCooldowns();
         const ordersState = dataManager.getOrdersState();
@@ -203,7 +213,6 @@ export default class UIScene extends Phaser.Scene {
                     slotUI.rewardText.setText(order.coinReward);
                     slotUI.rewardContainer.setVisible(true);
                     slotUI.timerText.setVisible(false);
-                    // slotUI.hitArea.input.enabled = true; // НЕ БЛОКИРУЕМ ВВОД ТУТ, иначе Drag застрянет
 
                     const hasItem = this.gameScene.findItemOnGrid(order.itemType);
                     
@@ -246,6 +255,9 @@ export default class UIScene extends Phaser.Scene {
     }
 
     highlightMatchingOrders(itemType) {
+        // ... (код без изменений)
+// ... (весь остальной код highlightMatchingOrders остается без изменений, просто вставьте его сюда)
+// ...
         this.orderSlotsUI.forEach(slot => {
             if (slot.currentOrderType === itemType) {
                 this.tweens.add({ targets: slot.container, scale: 1.15, duration: 200, ease: 'Back.out' });
@@ -256,6 +268,9 @@ export default class UIScene extends Phaser.Scene {
     }
 
     resetHighlights() {
+        // ... (код без изменений)
+// ... (весь остальной код resetHighlights остается без изменений, просто вставьте его сюда)
+// ...
         this.orderSlotsUI.forEach(slot => {
             slot.container.setAlpha(1);
             if (slot.isReady) {
@@ -266,18 +281,18 @@ export default class UIScene extends Phaser.Scene {
             }
         });
     }
-
-    // ИСПРАВЛЕННЫЙ МЕТОД: Проверка через глобальные границы контейнера
+    
     checkOrderDrop(x, y, itemType) {
+        // ... (код без изменений, он все еще нужен для InputHandler)
+// ... (весь остальной код checkOrderDrop остается без изменений, просто вставьте его сюда)
+// ...
         for (let i = 0; i < this.orderSlotsUI.length; i++) {
             const slot = this.orderSlotsUI[i];
-            if (slot.currentOrderType === itemType) {
-                // Используем границы всего контейнера, а не внутренней зоны
-                const bounds = slot.container.getBounds(); 
-                // Расширяем зону (padding)
-                const padding = 30;
-                if (x >= bounds.x - padding && x <= bounds.x + bounds.width + padding &&
-                    y >= bounds.y - padding && y <= bounds.y + bounds.height + padding) {
+            if (slot.isReady && slot.currentOrderType === itemType) {
+                const bounds = slot.container.getBounds();
+                const dropZone = new Phaser.Geom.Rectangle(bounds.x, bounds.y, bounds.width, bounds.height);
+                Phaser.Geom.Rectangle.Inflate(dropZone, 20, 20);
+                if (Phaser.Geom.Rectangle.Contains(dropZone, x, y)) {
                     return i;
                 }
             }
@@ -286,15 +301,20 @@ export default class UIScene extends Phaser.Scene {
     }
 
     checkOverlapWithTrash(x, y) {
+        // ... (код без изменений, он все еще нужен для InputHandler)
+// ... (весь остальной код checkOverlapWithTrash остается без изменений, просто вставьте его сюда)
+// ...
         if (!this.trashBin) return false;
-        // Используем глобальные границы
         const bounds = this.trashBin.getBounds();
-        const padding = 40; 
-        return (x >= bounds.x - padding && x <= bounds.x + bounds.width + padding &&
-                y >= bounds.y - padding && y <= bounds.y + bounds.height + padding);
+        const dropZone = new Phaser.Geom.Rectangle(bounds.x, bounds.y, bounds.width, bounds.height);
+        Phaser.Geom.Rectangle.Inflate(dropZone, 30, 30);
+        return Phaser.Geom.Rectangle.Contains(dropZone, x, y);
     }
     
     setTrashHighlight(isActive) {
+        // ... (код без изменений)
+// ... (весь остальной код setTrashHighlight остается без изменений, просто вставьте его сюда)
+// ...
         if (!this.trashBin) return;
         this.tweens.killTweensOf(this.trashBin);
         if (isActive) {
@@ -309,10 +329,16 @@ export default class UIScene extends Phaser.Scene {
     }
     
     playTrashAnimation() {
+        // ... (код без изменений)
+// ... (весь остальной код playTrashAnimation остается без изменений, просто вставьте его сюда)
+// ...
         this.tweens.add({ targets: this.trashBin, scale: 1.2, duration: 100, yoyo: true, ease: 'Quad.easeOut' });
     }
 
     handleFulfillOrder(slotIndex) {
+        // ... (код без изменений)
+// ... (весь остальной код handleFulfillOrder остается без изменений, просто вставьте его сюда)
+// ...
         if (this.isAnimatingOrder) return;
         const ordersState = dataManager.getOrdersState();
         const slotData = ordersState.orderSlots[slotIndex];
@@ -335,6 +361,9 @@ export default class UIScene extends Phaser.Scene {
     }
 
     handleDragFulfill(slotIndex, itemSprite) {
+        // ... (код без изменений)
+// ... (весь остальной код handleDragFulfill остается без изменений, просто вставьте его сюда)
+// ...
         if (this.isAnimatingOrder) {
             itemSprite.destroy();
             return;
@@ -377,6 +406,9 @@ export default class UIScene extends Phaser.Scene {
     }
 
     onFulfillAnimationComplete(position, reward) {
+        // ... (код без изменений)
+// ... (весь остальной код onFulfillAnimationComplete остается без изменений, просто вставьте его сюда)
+// ...
         this.coinEmitter.emitParticleAt(position.x, position.y, 10);
         this.tweens.add({ targets: this.coinsText, scale: 1.2, duration: 150, yoyo: true, ease: 'Quad.easeOut' });
         this.time.delayedCall(500, () => { this.isAnimatingOrder = false; });
@@ -387,6 +419,9 @@ export default class UIScene extends Phaser.Scene {
     applyMuteState() { this.sound.mute = dataManager.isMuted(); }
 
     showClearBoardPanel() {
+        // ... (код без изменений)
+// ... (весь остальной код showClearBoardPanel остается без изменений, просто вставьте его сюда)
+// ...
         if (this.clearBoardPanel) return;
         this.clearBoardPanel = this.add.container(this.game.config.width / 2, this.game.config.height / 2);
         this.clearBoardPanel.setDepth(100);
@@ -425,4 +460,97 @@ export default class UIScene extends Phaser.Scene {
         this.clearBoardPanel.add([overlay, panelBG, title, payBtn, adBtn, adBtnText, backBtn]);
     }
     hideClearBoardPanel() { if (this.clearBoardPanel) { this.clearBoardPanel.destroy(); this.clearBoardPanel = null; } }
+    
+    showNewDiscoveryPopup(itemType) {
+        // ... (код без изменений)
+// ... (весь остальной код showNewDiscoveryPopup остается без изменений, просто вставьте его сюда)
+// ...
+        const screenW = this.game.config.width;
+        const screenH = this.game.config.height;
+
+        const container = this.add.container(screenW / 2, screenH / 2).setDepth(500);
+        
+        const overlay = this.add.rectangle(0, 0, screenW, screenH, 0x000000, 0.8)
+            .setInteractive();
+        container.add(overlay);
+
+        const rays = this.add.image(0, 0, 'particle').setScale(5).setTint(0xFFD700).setAlpha(0.5);
+        this.tweens.add({ targets: rays, angle: 360, duration: 6000, repeat: -1 });
+        container.add(rays);
+        
+        const itemY = -screenH * 0.1;
+        const titleY = itemY + 100;
+        const subtitleY = titleY + 60;
+        const tipY = screenH * 0.5 - 100;
+
+        const item = this.add.sprite(0, itemY, itemType).setScale(0); 
+        this.tweens.add({ targets: item, scale: 1.5, duration: 500, ease: 'Back.out' });
+        container.add(item);
+
+        const title = this.add.text(0, titleY, "NEW RECIPE!", { fontSize: '40px', color: '#FFF', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5);
+        const subTitle = this.add.text(0, subtitleY, "You discovered a new dish!", { fontSize: '24px', color: '#DDD', align: 'center', wordWrap: { width: screenW * 0.8 } }).setOrigin(0.5);
+        const tip = this.add.text(0, tipY, "(Tap anywhere to close)", { fontSize: '18px', color: '#888' }).setOrigin(0.5);
+        container.add([title, subTitle, tip]);
+
+        let isClosing = false;
+        
+        const closePopup = () => {
+            if (isClosing) return;
+            isClosing = true;
+            
+            if (timer) timer.remove();
+
+            this.tweens.add({
+                targets: container,
+                alpha: 0,
+                duration: 300,
+                onComplete: () => {
+                    container.destroy();
+                    this.updateOrders();
+                }
+            });
+        };
+
+        const timer = this.time.delayedCall(4000, closePopup);
+        overlay.on('pointerdown', closePopup);
+    }
+    
+    // --- НОВЫЕ МЕТОДЫ ДЛЯ ОКНА ПОДТВЕРЖДЕНИЯ ---
+    showTrashConfirmationPanel(gameObject) {
+        if (this.trashConfirmationPanel) return;
+
+        this.trashConfirmationPanel = this.add.container(this.game.config.width / 2, this.game.config.height / 2);
+        this.trashConfirmationPanel.setDepth(600); // Выше, чем попап нового рецепта
+
+        const overlay = this.add.rectangle(0, 0, this.game.config.width, this.game.config.height, 0x000000, 0.7).setInteractive();
+        const panelBG = this.add.graphics().fillStyle(0x333333, 1).lineStyle(2, 0xffffff, 1).fillRoundedRect(-200, -125, 400, 250, 16);
+        const title = this.add.text(0, -80, "Delete item?", { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
+        
+        const confirmBtn = this.add.image(-80, 40, 'button').setInteractive();
+        this.add.text(confirmBtn.x, confirmBtn.y, "Yes", { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+
+        const cancelBtn = this.add.image(80, 40, 'button').setInteractive();
+        this.add.text(cancelBtn.x, cancelBtn.y, "No", { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+
+        confirmBtn.on('pointerdown', () => {
+            this.sound.play('click');
+            this.gameScene.events.emit('trashConfirm', gameObject);
+            this.hideTrashConfirmationPanel();
+        });
+
+        cancelBtn.on('pointerdown', () => {
+            this.sound.play('click');
+            this.gameScene.events.emit('trashCancel', gameObject);
+            this.hideTrashConfirmationPanel();
+        });
+
+        this.trashConfirmationPanel.add([overlay, panelBG, title, confirmBtn, cancelBtn]);
+    }
+
+    hideTrashConfirmationPanel() {
+        if (this.trashConfirmationPanel) {
+            this.trashConfirmationPanel.destroy();
+            this.trashConfirmationPanel = null;
+        }
+    }
 }

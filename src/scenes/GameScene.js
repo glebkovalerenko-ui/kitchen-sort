@@ -46,6 +46,11 @@ export default class GameScene extends Phaser.Scene {
             this.sound.play('music', { loop: true, volume: 0.4 });
         }
         
+        // --- НОВЫЕ СЛУШАТЕЛИ ДЛЯ ОКНА ПОДТВЕРЖДЕНИЯ ---
+        this.events.on('trashHover', this.onTrashHover, this);
+        this.events.on('trashConfirm', this.onTrashConfirm, this);
+        this.events.on('trashCancel', this.onTrashCancel, this);
+
         this.tapParticles = this.add.particles(0, 0, 'particle', {
             speed: { min: 80, max: 200 },
             angle: { min: 0, max: 360 },
@@ -100,7 +105,33 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
+    // --- НОВЫЕ МЕТОДЫ-ОБРАБОТЧИКИ ---
+    onTrashHover(gameObject) {
+        this.input.enabled = false; // "Замораживаем" ввод в GameScene
+        const uiScene = this.scene.get('UIScene');
+        if (uiScene) {
+            uiScene.showTrashConfirmationPanel(gameObject);
+        }
+    }
+
+    onTrashConfirm(gameObject) {
+        this.input.enabled = true; // "Размораживаем" ввод
+        this.handleTrashDrop(gameObject);
+        const uiScene = this.scene.get('UIScene');
+        if (uiScene) uiScene.playTrashAnimation();
+    }
+
+    onTrashCancel(gameObject) {
+        this.input.enabled = true; // "Размораживаем" ввод
+        this.snapToGrid(gameObject); // Возвращаем на место
+        this.inputHandler.isActionPending = false; // Сбрасываем флаг, чтобы можно было продолжить
+    }
+
+
     createGeneratorDock() {
+        // ... (код без изменений)
+// ... (весь остальной код GameScene.js остается без изменений, просто вставьте его сюда)
+// ...
         this.generatorIcons = {};
         this.generatorDock = this.add.container(
             this.game.config.width / 2,
@@ -369,7 +400,7 @@ export default class GameScene extends Phaser.Scene {
         const isNewUnlock = dataManager.unlockIngredient(recipe.output);
         if (isNewUnlock) {
             this.sound.play('unlock');
-            this.showNewDiscoveryPopup(recipe.output);
+            this.events.emit('newRecipeUnlocked', recipe.output);
         }
 
         this.gridManager.removeItem(sourceGridPos.x, sourceGridPos.y);
@@ -688,59 +719,5 @@ export default class GameScene extends Phaser.Scene {
             item.clearTint();
             item.setAlpha(1);
         });
-    }
-
-    // --- ОБНОВЛЕННЫЙ МЕТОД POPUP: ЗАКРЫТИЕ ПО ТАПУ + ТАЙМЕР ---
-    showNewDiscoveryPopup(itemType) {
-        this.input.enabled = false;
-
-        const container = this.add.container(this.game.config.width/2, this.game.config.height/2).setDepth(500);
-        
-        // ДЕЛАЕМ ФОН ИНТЕРАКТИВНЫМ ДЛЯ ЗАКРЫТИЯ
-        const overlay = this.add.rectangle(0, 0, this.game.config.width, this.game.config.height, 0x000000, 0.8)
-            .setInteractive();
-        container.add(overlay);
-
-        const rays = this.add.image(0, 0, 'particle').setScale(5).setTint(0xFFD700).setAlpha(0.5);
-        this.tweens.add({ targets: rays, angle: 360, duration: 6000, repeat: -1 });
-        container.add(rays);
-
-        const item = this.add.sprite(0, -20, itemType).setScale(0); 
-        this.tweens.add({ targets: item, scale: 1.5, duration: 500, ease: 'Back.out' });
-        container.add(item);
-
-        const title = this.add.text(0, 80, "NEW RECIPE!", { fontSize: '40px', color: '#FFF', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5);
-        const subTitle = this.add.text(0, 140, "You discovered a new dish!", { fontSize: '24px', color: '#DDD' }).setOrigin(0.5);
-        const tip = this.add.text(0, 300, "(Tap anywhere to close)", { fontSize: '18px', color: '#888' }).setOrigin(0.5);
-        container.add([title, subTitle, tip]);
-
-        // ЛОГИКА ЗАКРЫТИЯ
-        let isClosing = false;
-        
-        const closePopup = () => {
-            if (isClosing) return;
-            isClosing = true;
-            
-            // Если был таймер, отменяем его
-            if (timer) timer.remove();
-
-            this.tweens.add({
-                targets: container,
-                alpha: 0,
-                duration: 300,
-                onComplete: () => {
-                    container.destroy();
-                    this.input.enabled = true; 
-                    const ui = this.scene.get('UIScene');
-                    if (ui) ui.updateOrders();
-                }
-            });
-        };
-
-        // 1. Автоматический таймер
-        const timer = this.time.delayedCall(4000, closePopup);
-
-        // 2. Ручное закрытие по клику
-        overlay.on('pointerdown', closePopup);
     }
 }
