@@ -7,7 +7,6 @@ import MergeSystem from '../systems/MergeSystem.js';
 import InputHandler from '../systems/InputHandler.js';
 
 export default class GameScene extends Phaser.Scene {
-    // ... (конструктор, init, create - без изменений)
     constructor() {
         super('GameScene');
     }
@@ -25,7 +24,8 @@ export default class GameScene extends Phaser.Scene {
         this.GRID_COLS = 5;
         this.CELL_SIZE = 100;
         this.GRID_START_X = (this.game.config.width - (this.GRID_COLS * this.CELL_SIZE)) / 2;
-        this.GRID_START_Y = (this.game.config.height - (this.GRID_ROWS * this.CELL_SIZE)) / 2 - 50;
+        this.GRID_START_Y = 320; 
+        
         this.score = 0;
         this.ingredientsGroup = this.add.group();
         
@@ -75,7 +75,6 @@ export default class GameScene extends Phaser.Scene {
         this.events.emit('updateCoins', dataManager.getCoins());
     }
 
-    // ... (update, createGeneratorDock, playTapAnimation, onEnterGeneratorScene, onQuickCollect, updateGeneratorIconVisuals, onSceneResume, updateGridSave, handleDrop, handleMerge, startNewGame, clearBoard, addCollectedItemsToGrid, triggerGameOver, checkGameOverConditions, areGeneratorsEmpty, checkForPossibleMoves, saveGridState, restoreGrid, restoreAfterAd, createIngredient, snapToGrid - без изменений)
     update(time, delta) {
         for (const generatorId in GENERATORS) {
             const state = dataManager.getGeneratorState(generatorId);
@@ -366,9 +365,11 @@ export default class GameScene extends Phaser.Scene {
         dataManager.addCoins(coinsToAdd);
         this.events.emit('updateScore', this.score);
         this.events.emit('updateCoins', dataManager.getCoins());
+        
         const isNewUnlock = dataManager.unlockIngredient(recipe.output);
         if (isNewUnlock) {
             this.sound.play('unlock');
+            this.showNewDiscoveryPopup(recipe.output);
         }
 
         this.gridManager.removeItem(sourceGridPos.x, sourceGridPos.y);
@@ -587,12 +588,6 @@ export default class GameScene extends Phaser.Scene {
         return items.some(item => item.getData('type') === itemType);
     }
 
-    // --- ИЗМЕНЕНИЕ: Метод был переименован и улучшен для возврата позиции ---
-    /**
-     * Находит предмет на поле и возвращает его мировые координаты.
-     * @param {string} itemType - Тип предмета.
-     * @returns {Phaser.Math.Vector2|null} - Позиция предмета или null.
-     */
     getFulfillableItemPosition(itemType) {
         const item = this.ingredientsGroup.getChildren().find(i => i.getData('type') === itemType);
         if (item) {
@@ -616,33 +611,136 @@ export default class GameScene extends Phaser.Scene {
         return false;
     }
 
-    // --- НОВЫЙ МЕТОД: Анимация полета предмета ---
-    /**
-     * @param {string} itemType - Тип предмета для анимации.
-     * @param {Phaser.Math.Vector2} startPos - Начальная позиция (из GameScene).
-     * @param {Phaser.Math.Vector2} endPos - Конечная позиция (из UIScene).
-     * @param {function} onCompleteCallback - Функция, которая вызовется по завершении.
-     */
     playItemFlyAnimation(itemType, startPos, endPos, onCompleteCallback) {
-        // Немедленно удаляем настоящий предмет с поля
         this.removeItemByType(itemType);
 
-        // Создаем временный спрайт для анимации
         const tempSprite = this.add.sprite(startPos.x, startPos.y, itemType);
         tempSprite.setScale((this.CELL_SIZE / tempSprite.width) * 0.9);
-        tempSprite.setDepth(200); // Поверх всего
+        tempSprite.setDepth(200);
 
         this.tweens.add({
             targets: tempSprite,
             x: endPos.x,
             y: endPos.y,
-            scale: 0.2, // Уменьшаем в полете
-            duration: 500, // Длительность 0.5с
+            scale: 0.2,
+            duration: 500,
             ease: 'Cubic.easeIn',
             onComplete: () => {
                 tempSprite.destroy();
                 onCompleteCallback();
             }
         });
+    }
+
+    handleTrashDrop(item) {
+        const gridX = item.getData('gridX');
+        const gridY = item.getData('gridY');
+        
+        this.gridManager.removeItem(gridX, gridY);
+        
+        this.sound.play('swoosh', { rate: 2.0 }); 
+        
+        this.tweens.add({
+            targets: item,
+            scale: 0,
+            alpha: 0,
+            duration: 200,
+            onComplete: () => {
+                item.destroy();
+                this.updateGridSave();
+                this.checkGameOverConditions();
+            }
+        });
+    }
+
+    highlightMergeTargets(itemType, draggedItem) {
+        const items = this.ingredientsGroup.getChildren();
+        
+        items.forEach(item => {
+            if (item !== draggedItem && item.getData('type') === itemType) {
+                this.tweens.add({
+                    targets: item,
+                    scaleX: item.getData('baseScale') * 1.15,
+                    scaleY: item.getData('baseScale') * 1.15,
+                    duration: 400,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut',
+                    key: 'mergeHighlight'
+                });
+            } else if (item !== draggedItem) {
+                item.setAlpha(0.6);
+            }
+        });
+    }
+
+    resetMergeHighlights() {
+        const items = this.ingredientsGroup.getChildren();
+        
+        items.forEach(item => {
+            const tweens = this.tweens.getTweensOf(item);
+            tweens.forEach(t => {
+                if (t.data && t.data.find(d => d.key === 'scaleX')) {
+                    t.stop();
+                }
+            });
+            item.setScale(item.getData('baseScale'));
+            item.clearTint();
+            item.setAlpha(1);
+        });
+    }
+
+    // --- ОБНОВЛЕННЫЙ МЕТОД POPUP: ЗАКРЫТИЕ ПО ТАПУ + ТАЙМЕР ---
+    showNewDiscoveryPopup(itemType) {
+        this.input.enabled = false;
+
+        const container = this.add.container(this.game.config.width/2, this.game.config.height/2).setDepth(500);
+        
+        // ДЕЛАЕМ ФОН ИНТЕРАКТИВНЫМ ДЛЯ ЗАКРЫТИЯ
+        const overlay = this.add.rectangle(0, 0, this.game.config.width, this.game.config.height, 0x000000, 0.8)
+            .setInteractive();
+        container.add(overlay);
+
+        const rays = this.add.image(0, 0, 'particle').setScale(5).setTint(0xFFD700).setAlpha(0.5);
+        this.tweens.add({ targets: rays, angle: 360, duration: 6000, repeat: -1 });
+        container.add(rays);
+
+        const item = this.add.sprite(0, -20, itemType).setScale(0); 
+        this.tweens.add({ targets: item, scale: 1.5, duration: 500, ease: 'Back.out' });
+        container.add(item);
+
+        const title = this.add.text(0, 80, "NEW RECIPE!", { fontSize: '40px', color: '#FFF', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5);
+        const subTitle = this.add.text(0, 140, "You discovered a new dish!", { fontSize: '24px', color: '#DDD' }).setOrigin(0.5);
+        const tip = this.add.text(0, 300, "(Tap anywhere to close)", { fontSize: '18px', color: '#888' }).setOrigin(0.5);
+        container.add([title, subTitle, tip]);
+
+        // ЛОГИКА ЗАКРЫТИЯ
+        let isClosing = false;
+        
+        const closePopup = () => {
+            if (isClosing) return;
+            isClosing = true;
+            
+            // Если был таймер, отменяем его
+            if (timer) timer.remove();
+
+            this.tweens.add({
+                targets: container,
+                alpha: 0,
+                duration: 300,
+                onComplete: () => {
+                    container.destroy();
+                    this.input.enabled = true; 
+                    const ui = this.scene.get('UIScene');
+                    if (ui) ui.updateOrders();
+                }
+            });
+        };
+
+        // 1. Автоматический таймер
+        const timer = this.time.delayedCall(4000, closePopup);
+
+        // 2. Ручное закрытие по клику
+        overlay.on('pointerdown', closePopup);
     }
 }

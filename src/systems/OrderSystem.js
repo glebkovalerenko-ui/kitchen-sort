@@ -1,15 +1,15 @@
 // /src/systems/OrderSystem.js
 import { ORDERS_CONFIG, ITEM_TIERS, RECIPES, TILE_TYPES } from '../GameConfig.js';
 
-// Вспомогательная, кешируемая функция для расчета базовой стоимости предмета
+// Вспомогательная функция для расчета базовой стоимости предмета
 const coinValuesCache = new Map();
+
 function calculateBaseCoinValue(itemType) {
     if (coinValuesCache.has(itemType)) {
         return coinValuesCache.get(itemType);
     }
 
-    // Базовые предметы (Яйцо, Томат) не имеют рецепта, их стоимость для расчета = 0,
-    // так как они не тратят монеты игрока.
+    // Базовые предметы не имеют стоимости крафта (0)
     if (itemType === TILE_TYPES.EGG || itemType === TILE_TYPES.TOMATO) {
         return 0;
     }
@@ -20,19 +20,18 @@ function calculateBaseCoinValue(itemType) {
         return 0;
     }
 
-    // Стоимость предмета = стоимость его ингредиентов + монеты за само слияние
+    // Стоимость = стоимость ингредиентов + монеты за слияние
     const value = calculateBaseCoinValue(recipe.inputs[0]) +
-                    calculateBaseCoinValue(recipe.inputs[1]) +
-                    recipe.coins;
+                  calculateBaseCoinValue(recipe.inputs[1]) +
+                  recipe.coins;
     
     coinValuesCache.set(itemType, value);
     return value;
 }
 
-
 export default class OrderSystem {
     constructor() {
-        // Заполняем кеш при инициализации для ускорения работы
+        // Заполняем кеш при инициализации
         if (coinValuesCache.size === 0) {
             for (const itemKey in TILE_TYPES) {
                 const itemType = TILE_TYPES[itemKey];
@@ -41,82 +40,89 @@ export default class OrderSystem {
                 }
             }
         }
-        console.log("OrderSystem initialized and coin values cache populated.");
     }
 
     /**
-     * Генерирует новый заказ, основываясь на прогрессе игрока.
+     * Генерирует новый заказ, включая возможность "Discovery" (открытие нового предмета).
      * @param {string[]} unlockedItems - Массив ID предметов, открытых игроком.
-     * @returns {object|null} - Сгенерированный объект заказа или null.
+     * @returns {object|null} - Объект заказа или null.
      */
     generateNewOrder(unlockedItems) {
-        if (unlockedItems.length < 2) return null; // Нельзя дать заказ, если открыты только базовые предметы
+        if (unlockedItems.length < 2) return null;
 
-        // 1. Определяем максимальный уровень (tier) предметов, доступных игроку
-        let maxUnlockedTier = 0;
-        unlockedItems.forEach(item => {
-            if (ITEM_TIERS[item] > maxUnlockedTier) {
-                maxUnlockedTier = ITEM_TIERS[item];
+        // 1. Ищем кандидатов на открытие (Discovery)
+        // Предмет закрыт, но оба его ингредиента открыты
+        const discoveryCandidates = [];
+        RECIPES.forEach(recipe => {
+            const outputIsLocked = !unlockedItems.includes(recipe.output);
+            const input1Unlocked = unlockedItems.includes(recipe.inputs[0]);
+            const input2Unlocked = unlockedItems.includes(recipe.inputs[1]);
+            
+            if (outputIsLocked && input1Unlocked && input2Unlocked) {
+                discoveryCandidates.push(recipe.output);
             }
         });
 
-        // 2. Определяем целевые уровни для заказов разной сложности
-        const targetTiers = {
-            EASY: Math.max(2, maxUnlockedTier - 2),
-            MEDIUM: Math.max(3, maxUnlockedTier - 1),
-            HARD: Math.max(3, maxUnlockedTier),
-        };
+        let chosenItem = null;
+        let chosenDifficulty = 'EASY';
 
-        // 3. Выбираем случайную сложность (с уклоном в более легкие)
-        const difficultyRoll = Math.random();
-        let chosenDifficulty;
-        if (difficultyRoll < 0.5) chosenDifficulty = 'EASY';      // 50% шанс
-        else if (difficultyRoll < 0.85) chosenDifficulty = 'MEDIUM'; // 35% шанс
-        else chosenDifficulty = 'HARD';                         // 15% шанс
+        // 2. Логика выбора: Discovery (40%) или Обычный (60%)
+        if (discoveryCandidates.length > 0 && Math.random() < 0.4) {
+            chosenItem = discoveryCandidates[Math.floor(Math.random() * discoveryCandidates.length)];
+            chosenDifficulty = 'HARD'; // Новые предметы всегда ценятся высоко
+        } else {
+            // Стандартная логика
+            const maxUnlockedTier = Math.max(...unlockedItems.map(i => ITEM_TIERS[i] || 0));
+            
+            // Определяем целевые тиры
+            const targetTiers = {
+                EASY: Math.max(2, maxUnlockedTier - 2),
+                MEDIUM: Math.max(3, maxUnlockedTier - 1),
+                HARD: Math.max(3, maxUnlockedTier),
+            };
 
-        let targetTier = targetTiers[chosenDifficulty];
-        
-        // 4. Находим все открытые предметы, подходящие под выбранный уровень
-        const candidateItems = unlockedItems.filter(item => {
-            const itemTier = ITEM_TIERS[item];
-            // Для "сложных" заказов можем взять предмет на уровень выше, если он достижим
-            if (chosenDifficulty === 'HARD') {
-                return itemTier >= targetTier && itemTier <= targetTier + 1;
+            const roll = Math.random();
+            if (roll < 0.5) chosenDifficulty = 'EASY';
+            else if (roll < 0.85) chosenDifficulty = 'MEDIUM';
+            else chosenDifficulty = 'HARD';
+
+            let targetTier = targetTiers[chosenDifficulty];
+            
+            // Фильтруем предметы по тиру
+            let candidates = unlockedItems.filter(item => {
+                const t = ITEM_TIERS[item];
+                return chosenDifficulty === 'HARD' ? (t >= targetTier && t <= targetTier + 1) : t === targetTier;
+            });
+
+            // Фоллбэк, если кандидатов нет
+            if (candidates.length === 0) {
+                candidates = unlockedItems.filter(item => ITEM_TIERS[item] >= 2);
             }
-            return itemTier === targetTier;
-        });
 
-        if (candidateItems.length === 0) {
-            // Если для HARD нет кандидатов, пробуем MEDIUM
-            if (chosenDifficulty === 'HARD') {
-                chosenDifficulty = 'MEDIUM';
-                targetTier = targetTiers[chosenDifficulty];
-                const mediumCandidates = unlockedItems.filter(item => ITEM_TIERS[item] === targetTier);
-                 if (mediumCandidates.length > 0) candidateItems.push(...mediumCandidates);
-            }
-             // Если все еще пусто, даем любой открытый заказ, кроме базовых
-            if (candidateItems.length === 0) {
-                 const fallbackItems = unlockedItems.filter(item => ITEM_TIERS[item] > 1);
-                 if(fallbackItems.length === 0) return null;
-                 candidateItems.push(...fallbackItems);
+            if (candidates.length > 0) {
+                chosenItem = candidates[Math.floor(Math.random() * candidates.length)];
             }
         }
 
-        // 5. Выбираем случайный предмет из кандидатов
-        const chosenItem = candidateItems[Math.floor(Math.random() * candidateItems.length)];
-        
-        // 6. Рассчитываем награду
-        const baseValue = calculateBaseCoinValue(chosenItem);
-        const rewardMultiplier = ORDERS_CONFIG.REWARD_MULTIPLIER[chosenDifficulty];
-        const coinReward = Math.ceil((baseValue * rewardMultiplier) / 5) * 5; // Округляем до 5 для красоты
+        if (!chosenItem) return null;
 
-        // 7. Формируем и возвращаем объект заказа
+        // 3. Расчет награды
+        const baseValue = calculateBaseCoinValue(chosenItem);
+        const multiplier = ORDERS_CONFIG.REWARD_MULTIPLIER[chosenDifficulty];
+        
+        // Бонус x1.5 за Discovery заказ
+        const isDiscovery = discoveryCandidates.includes(chosenItem);
+        const finalMultiplier = isDiscovery ? multiplier * 1.5 : multiplier;
+
+        const coinReward = Math.ceil((baseValue * finalMultiplier) / 5) * 5;
+
         return {
-            id: `order_${Date.now()}_${Math.random()}`, // Уникальный ID
+            id: `order_${Date.now()}_${Math.random()}`,
             itemType: chosenItem,
-            amount: 1, // Пока всегда 1 предмет
+            amount: 1,
             coinReward: coinReward,
-            difficulty: chosenDifficulty
+            difficulty: chosenDifficulty,
+            isDiscovery: isDiscovery // Флаг для UI (черный силуэт)
         };
     }
 }
