@@ -12,7 +12,7 @@ export default class SettingsScene extends Phaser.Scene {
         const overlay = this.add.rectangle(0, 0, this.game.config.width, this.game.config.height, 0x000000, 0.85).setOrigin(0);
         overlay.setInteractive();
 
-        this.add.text(this.game.config.width / 2, 100, "SETTINGS", { fontSize: '48px', fill: '#ffffff', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5);
+        this.add.text(this.game.config.width / 2, 100, localizationManager.getString('settings_title'), { fontSize: '48px', fill: '#ffffff', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5);
 
         const centerX = this.game.config.width / 2;
         let currentY = 250;
@@ -21,14 +21,14 @@ export default class SettingsScene extends Phaser.Scene {
         // 1. Кнопка Звука
         const isMuted = dataManager.isMuted();
         const soundBtn = this.add.image(centerX, currentY, 'button').setScale(1.2).setInteractive();
-        const soundText = this.add.text(centerX, currentY, isMuted ? "Sound: OFF" : "Sound: ON", { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+        const soundText = this.add.text(centerX, currentY, isMuted ? localizationManager.getString('settings_sound_off') : localizationManager.getString('settings_sound_on'), { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
         
         soundBtn.on('pointerdown', () => {
             this.sound.play('click');
             const newMuteState = !dataManager.isMuted();
             dataManager.setMuted(newMuteState);
             this.sound.mute = newMuteState;
-            soundText.setText(newMuteState ? "Sound: OFF" : "Sound: ON");
+            soundText.setText(newMuteState ? localizationManager.getString('settings_sound_off') : localizationManager.getString('settings_sound_on'));
             
             const uiScene = this.scene.get('UIScene');
             if (uiScene) uiScene.applyMuteState(); 
@@ -41,6 +41,8 @@ export default class SettingsScene extends Phaser.Scene {
         collectionBtn.on('pointerdown', () => {
             this.sound.play('click');
             this.scene.launch('CollectionScene');
+            // ИЗМЕНЕНИЕ: Останавливаем текущую сцену, чтобы она не оставалась под новой
+            this.scene.stop();
         });
         currentY += spacing;
 
@@ -50,6 +52,8 @@ export default class SettingsScene extends Phaser.Scene {
         shopBtn.on('pointerdown', () => {
             this.sound.play('click');
             this.scene.launch('UpgradeScene');
+            // ИЗМЕНЕНИЕ: Останавливаем текущую сцену, чтобы она не оставалась под новой
+            this.scene.stop();
         });
         currentY += spacing;
 

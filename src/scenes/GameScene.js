@@ -46,7 +46,6 @@ export default class GameScene extends Phaser.Scene {
             this.sound.play('music', { loop: true, volume: 0.4 });
         }
         
-        // --- НОВЫЕ СЛУШАТЕЛИ ДЛЯ ОКНА ПОДТВЕРЖДЕНИЯ ---
         this.events.on('trashHover', this.onTrashHover, this);
         this.events.on('trashConfirm', this.onTrashConfirm, this);
         this.events.on('trashCancel', this.onTrashCancel, this);
@@ -105,9 +104,9 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
-    // --- НОВЫЕ МЕТОДЫ-ОБРАБОТЧИКИ ---
     onTrashHover(gameObject) {
-        this.input.enabled = false; // "Замораживаем" ввод в GameScene
+        // --- ИЗМЕНЕНИЕ: Не выключаем систему ввода, а просто скрываем объект
+        gameObject.setVisible(false);
         const uiScene = this.scene.get('UIScene');
         if (uiScene) {
             uiScene.showTrashConfirmationPanel(gameObject);
@@ -115,23 +114,21 @@ export default class GameScene extends Phaser.Scene {
     }
 
     onTrashConfirm(gameObject) {
-        this.input.enabled = true; // "Размораживаем" ввод
+        this.resetAllVisuals();
         this.handleTrashDrop(gameObject);
         const uiScene = this.scene.get('UIScene');
         if (uiScene) uiScene.playTrashAnimation();
     }
 
     onTrashCancel(gameObject) {
-        this.input.enabled = true; // "Размораживаем" ввод
-        this.snapToGrid(gameObject); // Возвращаем на место
-        this.inputHandler.isActionPending = false; // Сбрасываем флаг, чтобы можно было продолжить
+        // --- ИЗМЕНЕНИЕ: Делаем объект видимым обратно
+        gameObject.setVisible(true);
+        this.resetAllVisuals();
+        this.snapToGrid(gameObject);
+        this.inputHandler.isActionPending = false;
     }
 
-
     createGeneratorDock() {
-        // ... (код без изменений)
-// ... (весь остальной код GameScene.js остается без изменений, просто вставьте его сюда)
-// ...
         this.generatorIcons = {};
         this.generatorDock = this.add.container(
             this.game.config.width / 2,
@@ -162,39 +159,36 @@ export default class GameScene extends Phaser.Scene {
             this.generatorIcons[id] = { container, icon, chargesText, timerText };
     
             let pressTimer = null;
-            let inflationTween = null;
 
             const cancelAction = () => {
                 if (pressTimer) {
                     pressTimer.remove();
                     pressTimer = null;
                 }
-                if (inflationTween) {
-                    inflationTween.stop();
-                    inflationTween = null;
-                    this.tweens.add({
-                        targets: icon,
-                        scale: icon.getData('baseScale'),
-                        duration: 200,
-                        ease: 'Back.easeOut'
-                    });
-                }
+                this.tweens.killTweensOf(icon);
+                this.tweens.add({
+                    targets: icon,
+                    scale: icon.getData('baseScale'),
+                    duration: 200,
+                    ease: 'Back.easeOut'
+                });
             };
     
             icon.on('pointerdown', () => {
                 this.tweens.killTweensOf(icon);
                 icon.setData('longPressTriggered', false);
-    
+                
                 pressTimer = this.time.delayedCall(LONG_PRESS_DURATION, () => {
                     icon.setData('longPressTriggered', true);
                     this.onEnterGeneratorScene(id);
                 });
-    
-                inflationTween = this.tweens.add({
+
+                this.tweens.chain({
                     targets: icon,
-                    scale: INFLATED_SCALE,
-                    duration: LONG_PRESS_DURATION,
-                    ease: 'Quad.easeOut'
+                    tweens: [
+                        { scale: BASE_SCALE * 0.9, duration: 80, ease: 'Quad.easeOut' },
+                        { scale: INFLATED_SCALE, duration: LONG_PRESS_DURATION, ease: 'Quad.easeOut' }
+                    ]
                 });
             });
     
@@ -218,9 +212,6 @@ export default class GameScene extends Phaser.Scene {
         this.tweens.killTweensOf(target.parentContainer);
 
         if (isSuccess) {
-            target.setTintFill(0xffffff);
-            this.time.delayedCall(100, () => target.clearTint());
-
             const worldPos = new Phaser.Math.Vector2();
             target.getWorldTransformMatrix().transformPoint(0, 0, worldPos);
             this.tapParticles.emitParticleAt(worldPos.x, worldPos.y, 10);
@@ -228,11 +219,11 @@ export default class GameScene extends Phaser.Scene {
             this.tweens.chain({
                 targets: target,
                 tweens: [
-                    { scale: target.getData('baseScale') + 0.04, duration: 100, ease: 'Quad.easeOut' },
+                    { scale: target.getData('baseScale') * 0.85, duration: 80, ease: 'Quad.easeOut' },
                     { scale: target.getData('baseScale'), duration: 250, ease: 'Back.easeOut' }
                 ]
             });
-        } else {
+        } else { 
             target.setTintFill(0xff0000);
             this.time.delayedCall(150, () => target.clearTint());
             
@@ -410,35 +401,44 @@ export default class GameScene extends Phaser.Scene {
         const targetPixelY = targetObject.y;
 
         this.tweens.add({
-            targets: [draggedObject, targetObject],
-            scale: 0,
-            alpha: 0,
-            duration: 200,
-            ease: 'Power2',
+            targets: draggedObject,
+            x: targetPixelX,
+            y: targetPixelY,
+            duration: 100,
+            ease: 'Quad.easeIn',
             onComplete: () => {
-                draggedObject.destroy();
-                targetObject.destroy();
-                const emitter = this.add.particles(targetPixelX, targetPixelY, 'particle', {
-                    speed: { min: 50, max: 150 },
-                    angle: { min: 0, max: 360 },
-                    scale: { start: 0.8, end: 0 },
-                    blendMode: 'ADD',
-                    lifespan: 300,
-                    tint: 0xffff00,
-                    emitting: false
-                });
-                emitter.explode(16);
-                const newIngredient = this.createIngredient(targetGridPos.x, targetGridPos.y, recipe.output);
-                const finalScale = newIngredient.scale;
-                newIngredient.setScale(0);
                 this.tweens.add({
-                    targets: newIngredient,
-                    scale: finalScale,
-                    duration: 300,
-                    ease: 'Back.easeOut',
+                    targets: [draggedObject, targetObject],
+                    scale: 0,
+                    alpha: 0,
+                    duration: 200,
+                    ease: 'Power2',
                     onComplete: () => {
-                        this.updateGridSave();
-                        this.checkGameOverConditions();
+                        draggedObject.destroy();
+                        targetObject.destroy();
+                        
+                        const emitter = this.add.particles(targetPixelX, targetPixelY, 'particle', {
+                            speed: { min: 50, max: 150 }, angle: { min: 0, max: 360 },
+                            scale: { start: 0.8, end: 0 }, blendMode: 'ADD',
+                            lifespan: 300, tint: 0xffff00, emitting: false
+                        });
+                        emitter.explode(16);
+
+                        const newIngredient = this.createIngredient(targetGridPos.x, targetGridPos.y, recipe.output);
+                        const finalScale = newIngredient.scale;
+                        newIngredient.setScale(0);
+
+                        this.tweens.chain({
+                            targets: newIngredient,
+                            tweens: [
+                                { scaleX: finalScale * 1.2, scaleY: finalScale * 0.8, duration: 150, ease: 'Quad.easeOut' },
+                                { scaleX: finalScale, scaleY: finalScale, duration: 200, ease: 'Back.easeOut' }
+                            ],
+                             onComplete: () => {
+                                this.updateGridSave();
+                                this.checkGameOverConditions();
+                            }
+                        });
                     }
                 });
             }
@@ -688,7 +688,11 @@ export default class GameScene extends Phaser.Scene {
         const items = this.ingredientsGroup.getChildren();
         
         items.forEach(item => {
-            if (item !== draggedItem && item.getData('type') === itemType) {
+            if (item === draggedItem) return;
+
+            const recipe = this.mergeSystem.findRecipe(itemType, item.getData('type'));
+
+            if (recipe) {
                 this.tweens.add({
                     targets: item,
                     scaleX: item.getData('baseScale') * 1.15,
@@ -696,28 +700,26 @@ export default class GameScene extends Phaser.Scene {
                     duration: 400,
                     yoyo: true,
                     repeat: -1,
-                    ease: 'Sine.easeInOut',
-                    key: 'mergeHighlight'
+                    ease: 'Sine.easeInOut'
                 });
-            } else if (item !== draggedItem) {
+            } else {
                 item.setAlpha(0.6);
             }
         });
     }
 
-    resetMergeHighlights() {
+    resetAllVisuals() {
         const items = this.ingredientsGroup.getChildren();
-        
         items.forEach(item => {
-            const tweens = this.tweens.getTweensOf(item);
-            tweens.forEach(t => {
-                if (t.data && t.data.find(d => d.key === 'scaleX')) {
-                    t.stop();
-                }
-            });
+            this.tweens.killTweensOf(item);
             item.setScale(item.getData('baseScale'));
             item.clearTint();
             item.setAlpha(1);
         });
+
+        const uiScene = this.scene.get('UIScene');
+        if (uiScene && uiScene.resetUIHighlights) {
+            uiScene.resetUIHighlights();
+        }
     }
 }

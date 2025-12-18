@@ -26,7 +26,9 @@ export default class InputHandler {
 
         const uiScene = this.scene.scene.get('UIScene');
         if (uiScene) {
-            uiScene.highlightMatchingOrders(itemType);
+            if (uiScene.onDragStartUI) {
+                uiScene.onDragStartUI(itemType);
+            }
             uiScene.setTrashHighlight(true);
         }
     }
@@ -39,14 +41,12 @@ export default class InputHandler {
         const uiScene = this.scene.scene.get('UIScene');
         if (!uiScene) return;
 
-        // 1. Проверка наведения на корзину
         if (uiScene.checkOverlapWithTrash(pointer.x, pointer.y)) {
             this.isActionPending = true;
             this.scene.events.emit('trashHover', gameObject);
             return;
         }
 
-        // 2. Проверка наведения на заказ
         const orderDropIndex = uiScene.checkOrderDrop(pointer.x, pointer.y, gameObject.getData('type'));
         if (orderDropIndex !== -1) {
             this.isActionPending = true;
@@ -61,31 +61,35 @@ export default class InputHandler {
     }
 
     onDragEnd(pointer, gameObject) {
-        // Если действие уже в процессе (например, ждем подтверждения удаления), ничего не делаем
-        if (this.isActionPending) {
+        const uiScene = this.scene.scene.get('UIScene');
+        
+        if (uiScene && uiScene.onDragEndUI) {
+            uiScene.onDragEndUI();
+        }
+
+        if (!gameObject.active) {
             this.draggedObject = null;
             return;
         }
 
-        if (gameObject.active) {
-            gameObject.setScale(gameObject.getData('baseScale')); 
-            
-            this.scene.resetMergeHighlights();
+        gameObject.setScale(gameObject.getData('baseScale')); 
+        
+        if (this.scene.resetAllVisuals) {
+            this.scene.resetAllVisuals();
+        }
 
-            const uiScene = this.scene.scene.get('UIScene');
-            if (uiScene) {
-                uiScene.resetHighlights(); 
-                uiScene.setTrashHighlight(false);
-            }
-
-            const gridX = Math.floor((pointer.x - this.scene.GRID_START_X) / this.scene.CELL_SIZE);
-            const gridY = Math.floor((pointer.y - this.scene.GRID_START_Y) / this.scene.CELL_SIZE);
-            
-            if (this.scene.gridManager.isValidGridPosition(gridX, gridY)) {
-                 this.scene.handleDrop(gameObject, gridX, gridY);
-            } else {
-                 this.scene.snapToGrid(gameObject);
-            }
+        if (this.isActionPending) {
+            this.draggedObject = null;
+            return;
+        }
+        
+        const gridX = Math.floor((pointer.x - this.scene.GRID_START_X) / this.scene.CELL_SIZE);
+        const gridY = Math.floor((pointer.y - this.scene.GRID_START_Y) / this.scene.CELL_SIZE);
+        
+        if (this.scene.gridManager.isValidGridPosition(gridX, gridY)) {
+             this.scene.handleDrop(gameObject, gridX, gridY);
+        } else {
+             this.scene.snapToGrid(gameObject);
         }
         
         this.draggedObject = null;

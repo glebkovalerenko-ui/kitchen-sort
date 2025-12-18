@@ -28,6 +28,7 @@ export default class UIScene extends Phaser.Scene {
         
         const settingsBtn = this.add.image(this.game.config.width - 40, 50, 'button').setScale(0.7).setInteractive();
         this.add.text(settingsBtn.x, settingsBtn.y, '⚙️', { fontSize: '30px' }).setOrigin(0.5);
+        this.applyButtonClickAnimation(settingsBtn);
         
         settingsBtn.on('pointerdown', () => {
             this.sound.play('click');
@@ -38,6 +39,7 @@ export default class UIScene extends Phaser.Scene {
         this.trashBin = this.add.image(this.game.config.width - 60, this.game.config.height - 180, 'button').setScale(1.0).setInteractive();
         this.trashBin.setTint(0xFFaaaa); 
         this.add.text(this.trashBin.x, this.trashBin.y, '🗑️', { fontSize: '40px' }).setOrigin(0.5);
+        this.applyButtonClickAnimation(this.trashBin);
         
         this.trashBin.on('pointerdown', () => {
             this.sound.play('click');
@@ -74,16 +76,26 @@ export default class UIScene extends Phaser.Scene {
         });
     }
 
+    onDragStartUI(draggedItemType) {
+        this.orderSlotsUI.forEach(slot => {
+            slot.hitArea.input.enabled = false;
+        });
+        this.highlightMatchingOrders(draggedItemType);
+    }
+
+    onDragEndUI() {
+        this.orderSlotsUI.forEach(slot => {
+            slot.hitArea.input.enabled = true;
+        });
+    }
+
     createOrdersPanel() {
-        // ... (код без изменений)
-// ... (весь остальной код createOrdersPanel остается без изменений, просто вставьте его сюда)
-// ...
-        const slotWidth = 160; 
-        const slotHeight = 160;
+        this.slotWidth = 160;
+        this.slotHeight = 160;
         const gap = 20; 
         
-        const totalWidth = (slotWidth * ORDERS_CONFIG.MAX_ACTIVE_ORDERS) + (gap * (ORDERS_CONFIG.MAX_ACTIVE_ORDERS - 1));
-        const startX = (this.game.config.width - totalWidth) / 2 + (slotWidth / 2);
+        const totalWidth = (this.slotWidth * ORDERS_CONFIG.MAX_ACTIVE_ORDERS) + (gap * (ORDERS_CONFIG.MAX_ACTIVE_ORDERS - 1));
+        const startX = (this.game.config.width - totalWidth) / 2 + (this.slotWidth / 2);
         const startY = 130; 
 
         this.ordersContainer = this.add.container(0, 0); 
@@ -94,13 +106,13 @@ export default class UIScene extends Phaser.Scene {
         this.ordersContainer.add(title);
 
         for (let i = 0; i < ORDERS_CONFIG.MAX_ACTIVE_ORDERS; i++) {
-            const xPos = startX + (i * (slotWidth + gap));
-            const yPos = startY + (slotHeight / 2);
+            const xPos = startX + (i * (this.slotWidth + gap));
+            const yPos = startY + (this.slotHeight / 2);
 
             const slotContainer = this.add.container(xPos, yPos);
             
             const bg = this.add.graphics();
-            this.drawOrderCardBackground(bg, slotWidth, slotHeight, false);
+            this.drawOrderCardBackground(bg, this.slotWidth, this.slotHeight, false);
 
             const itemSprite = this.add.sprite(0, -20, 'egg').setDisplaySize(65, 65);
             
@@ -118,7 +130,7 @@ export default class UIScene extends Phaser.Scene {
             const rewardText = this.add.text(-10, 0, '0', { fontSize: '18px', fill: '#FFF', fontStyle: 'bold' }).setOrigin(0, 0.5);
             rewardContainer.add([rewardBg, coinIcon, rewardText]);
             
-            const readyIcon = this.add.container(slotWidth/2 - 20, -slotHeight/2 + 20);
+            const readyIcon = this.add.container(this.slotWidth/2 - 20, -this.slotHeight/2 + 20);
             const readyCircle = this.add.graphics().fillStyle(0x4CAF50, 1).lineStyle(2, 0xFFFFFF, 1).fillCircle(0, 0, 14).strokeCircle(0,0,14);
             const checkMark = this.add.text(0, 0, '✔', { fontSize: '18px', color: '#FFF', fontStyle: 'bold' }).setOrigin(0.5);
             readyIcon.add([readyCircle, checkMark]);
@@ -126,7 +138,7 @@ export default class UIScene extends Phaser.Scene {
 
             const timerText = this.add.text(0, 0, '', { fontSize: '24px', fill: '#555', fontStyle: 'bold' }).setOrigin(0.5);
             
-            const hitArea = this.add.zone(0, 0, slotWidth, slotHeight).setInteractive();
+            const hitArea = this.add.zone(0, 0, this.slotWidth, this.slotHeight).setInteractive();
             hitArea.setData({ type: 'order', slotIndex: i });
             
             slotContainer.add([bg, itemSprite, recipeContainer, rewardContainer, readyIcon, timerText, hitArea]);
@@ -135,8 +147,6 @@ export default class UIScene extends Phaser.Scene {
             hitArea.on('pointerdown', () => { 
                 if (this.orderSlotsUI[i].isReady && !this.isAnimatingOrder) {
                      this.handleFulfillOrder(i);
-                } else {
-                    this.tweens.add({ targets: slotContainer, x: xPos + 5, duration: 50, yoyo: true, repeat: 3 });
                 }
             });
 
@@ -152,9 +162,6 @@ export default class UIScene extends Phaser.Scene {
     }
 
     drawOrderCardBackground(graphics, w, h, isReady) {
-        // ... (код без изменений)
-// ... (весь остальной код drawOrderCardBackground остается без изменений, просто вставьте его сюда)
-// ...
         graphics.clear();
         if (isReady) {
             graphics.fillStyle(0xE8F5E9, 1);
@@ -168,9 +175,6 @@ export default class UIScene extends Phaser.Scene {
     }
 
     updateOrders() {
-        // ... (код без изменений)
-// ... (весь остальной код updateOrders остается без изменений, просто вставьте его сюда)
-// ...
         if (this.isAnimatingOrder) return;
         dataManager.updateOrderCooldowns();
         const ordersState = dataManager.getOrdersState();
@@ -218,13 +222,12 @@ export default class UIScene extends Phaser.Scene {
                     
                     if (hasItem && !wasReady) {
                         slotUI.isReady = true;
-                        this.drawOrderCardBackground(slotUI.bg, 160, 160, true);
+                        this.drawOrderCardBackground(slotUI.bg, this.slotWidth, this.slotHeight, true);
                         slotUI.readyIcon.setVisible(true);
                         this.tweens.add({ targets: slotUI.container, scale: 1.05, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
                     } else if (!hasItem && wasReady) {
                         slotUI.isReady = false;
-                        this.drawOrderCardBackground(slotUI.bg, 160, 160, false);
-                        slotUI.readyIcon.setVisible(false);
+                        this.drawOrderCardBackground(slotUI.bg, this.slotWidth, this.slotHeight, false);
                         this.tweens.killTweensOf(slotUI.container);
                         slotUI.container.setScale(1);
                     }
@@ -255,11 +258,8 @@ export default class UIScene extends Phaser.Scene {
     }
 
     highlightMatchingOrders(itemType) {
-        // ... (код без изменений)
-// ... (весь остальной код highlightMatchingOrders остается без изменений, просто вставьте его сюда)
-// ...
         this.orderSlotsUI.forEach(slot => {
-            if (slot.currentOrderType === itemType) {
+            if (slot.isReady && slot.currentOrderType === itemType) {
                 this.tweens.add({ targets: slot.container, scale: 1.15, duration: 200, ease: 'Back.out' });
             } else {
                 slot.container.setAlpha(0.6);
@@ -267,32 +267,24 @@ export default class UIScene extends Phaser.Scene {
         });
     }
 
-    resetHighlights() {
-        // ... (код без изменений)
-// ... (весь остальной код resetHighlights остается без изменений, просто вставьте его сюда)
-// ...
+    resetUIHighlights() {
         this.orderSlotsUI.forEach(slot => {
             slot.container.setAlpha(1);
+            this.tweens.killTweensOf(slot.container);
+            slot.container.setScale(1);
             if (slot.isReady) {
-                this.tweens.killTweensOf(slot.container);
                 this.tweens.add({ targets: slot.container, scale: 1.05, duration: 700, yoyo: true, repeat: -1 });
-            } else {
-                this.tweens.add({ targets: slot.container, scale: 1, duration: 200 });
             }
         });
+        this.setTrashHighlight(false);
     }
     
     checkOrderDrop(x, y, itemType) {
-        // ... (код без изменений, он все еще нужен для InputHandler)
-// ... (весь остальной код checkOrderDrop остается без изменений, просто вставьте его сюда)
-// ...
         for (let i = 0; i < this.orderSlotsUI.length; i++) {
             const slot = this.orderSlotsUI[i];
             if (slot.isReady && slot.currentOrderType === itemType) {
                 const bounds = slot.container.getBounds();
-                const dropZone = new Phaser.Geom.Rectangle(bounds.x, bounds.y, bounds.width, bounds.height);
-                Phaser.Geom.Rectangle.Inflate(dropZone, 20, 20);
-                if (Phaser.Geom.Rectangle.Contains(dropZone, x, y)) {
+                if (bounds.contains(x, y)) {
                     return i;
                 }
             }
@@ -301,9 +293,6 @@ export default class UIScene extends Phaser.Scene {
     }
 
     checkOverlapWithTrash(x, y) {
-        // ... (код без изменений, он все еще нужен для InputHandler)
-// ... (весь остальной код checkOverlapWithTrash остается без изменений, просто вставьте его сюда)
-// ...
         if (!this.trashBin) return false;
         const bounds = this.trashBin.getBounds();
         const dropZone = new Phaser.Geom.Rectangle(bounds.x, bounds.y, bounds.width, bounds.height);
@@ -312,9 +301,6 @@ export default class UIScene extends Phaser.Scene {
     }
     
     setTrashHighlight(isActive) {
-        // ... (код без изменений)
-// ... (весь остальной код setTrashHighlight остается без изменений, просто вставьте его сюда)
-// ...
         if (!this.trashBin) return;
         this.tweens.killTweensOf(this.trashBin);
         if (isActive) {
@@ -329,28 +315,24 @@ export default class UIScene extends Phaser.Scene {
     }
     
     playTrashAnimation() {
-        // ... (код без изменений)
-// ... (весь остальной код playTrashAnimation остается без изменений, просто вставьте его сюда)
-// ...
         this.tweens.add({ targets: this.trashBin, scale: 1.2, duration: 100, yoyo: true, ease: 'Quad.easeOut' });
     }
 
     handleFulfillOrder(slotIndex) {
-        // ... (код без изменений)
-// ... (весь остальной код handleFulfillOrder остается без изменений, просто вставьте его сюда)
-// ...
         if (this.isAnimatingOrder) return;
         const ordersState = dataManager.getOrdersState();
         const slotData = ordersState.orderSlots[slotIndex];
         const order = ordersState.activeOrders.find(o => o.id === slotData.orderId);
         if (!order) return;
         
+        const slotUI = this.orderSlotsUI[slotIndex];
+        this.tweens.killTweensOf(slotUI.container);
+
         this.isAnimatingOrder = true;
         this.sound.play('click');
         const startPos = this.gameScene.getFulfillableItemPosition(order.itemType);
         if (!startPos) { this.isAnimatingOrder = false; return; }
 
-        const slotUI = this.orderSlotsUI[slotIndex];
         const endPos = new Phaser.Math.Vector2();
         slotUI.itemSprite.getWorldTransformMatrix().transformPoint(0, 0, endPos);
 
@@ -361,9 +343,6 @@ export default class UIScene extends Phaser.Scene {
     }
 
     handleDragFulfill(slotIndex, itemSprite) {
-        // ... (код без изменений)
-// ... (весь остальной код handleDragFulfill остается без изменений, просто вставьте его сюда)
-// ...
         if (this.isAnimatingOrder) {
             itemSprite.destroy();
             return;
@@ -380,9 +359,15 @@ export default class UIScene extends Phaser.Scene {
             return;
         }
 
+        const slotUI = this.orderSlotsUI[slotIndex];
+        this.tweens.killTweensOf(slotUI.container);
+
+        if (this.gameScene.resetAllVisuals) {
+            this.gameScene.resetAllVisuals();
+        }
+
         dataManager.fulfillOrder(order.id);
         
-        const slotUI = this.orderSlotsUI[slotIndex];
         const endPos = new Phaser.Math.Vector2();
         slotUI.itemSprite.getWorldTransformMatrix().transformPoint(0, 0, endPos);
 
@@ -399,6 +384,7 @@ export default class UIScene extends Phaser.Scene {
             duration: 200,
             onComplete: () => {
                 itemSprite.destroy();
+                this.gameScene.events.emit('updateCoins', dataManager.getCoins());
             }
         });
 
@@ -406,11 +392,9 @@ export default class UIScene extends Phaser.Scene {
     }
 
     onFulfillAnimationComplete(position, reward) {
-        // ... (код без изменений)
-// ... (весь остальной код onFulfillAnimationComplete остается без изменений, просто вставьте его сюда)
-// ...
         this.coinEmitter.emitParticleAt(position.x, position.y, 10);
         this.tweens.add({ targets: this.coinsText, scale: 1.2, duration: 150, yoyo: true, ease: 'Quad.easeOut' });
+        this.gameScene.events.emit('updateCoins', dataManager.getCoins());
         this.time.delayedCall(500, () => { this.isAnimatingOrder = false; });
     }
 
@@ -419,9 +403,6 @@ export default class UIScene extends Phaser.Scene {
     applyMuteState() { this.sound.mute = dataManager.isMuted(); }
 
     showClearBoardPanel() {
-        // ... (код без изменений)
-// ... (весь остальной код showClearBoardPanel остается без изменений, просто вставьте его сюда)
-// ...
         if (this.clearBoardPanel) return;
         this.clearBoardPanel = this.add.container(this.game.config.width / 2, this.game.config.height / 2);
         this.clearBoardPanel.setDepth(100);
@@ -429,8 +410,10 @@ export default class UIScene extends Phaser.Scene {
         overlay.on('pointerdown', () => {});
         const panelBG = this.add.graphics().fillStyle(0x333333, 1).lineStyle(2, 0xffffff, 1).fillRoundedRect(-250, -240, 500, 480, 16);
         const title = this.add.text(0, -190, localizationManager.getString('clear_board_title'), { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
+        
         const payBtn = this.add.image(0, -60, 'button').setScale(1.2).setInteractive();
-        this.add.text(payBtn.x, payBtn.y, `${CLEAR_BOARD_COST}`, { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+        const payBtnText = this.add.text(payBtn.x, payBtn.y, localizationManager.getString('btn_clear_board_pay', { cost: CLEAR_BOARD_COST }), { fontSize: '28px', fill: '#000' }).setOrigin(0.5);
+        this.applyButtonClickAnimation(payBtn);
         
         payBtn.on('pointerdown', () => {
             if (dataManager.removeCoins(CLEAR_BOARD_COST)) {
@@ -445,6 +428,8 @@ export default class UIScene extends Phaser.Scene {
 
         const adBtn = this.add.image(0, 60, 'button').setScale(1.2).setInteractive();
         const adBtnText = this.add.text(adBtn.x, adBtn.y, localizationManager.getString('clear_board_ad'), { fontSize: '28px', fill: '#000' }).setOrigin(0.5);
+        this.applyButtonClickAnimation(adBtn);
+
         adBtn.on('pointerdown', () => {
             adBtn.disableInteractive().setTint(0x888888);
             adBtnText.setText(localizationManager.getString('ui_loading'));
@@ -454,17 +439,17 @@ export default class UIScene extends Phaser.Scene {
                 onClose: () => { if(adBtn.active) { adBtn.setInteractive().clearTint(); adBtnText.setText(localizationManager.getString('clear_board_ad')); }}
             });
         });
+
         const backBtn = this.add.image(0, 180, 'button').setInteractive();
-        this.add.text(backBtn.x, backBtn.y, localizationManager.getString('btn_back'), { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+        const backBtnText = this.add.text(backBtn.x, backBtn.y, localizationManager.getString('btn_back'), { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+        this.applyButtonClickAnimation(backBtn);
+
         backBtn.on('pointerdown', this.hideClearBoardPanel, this);
-        this.clearBoardPanel.add([overlay, panelBG, title, payBtn, adBtn, adBtnText, backBtn]);
+        this.clearBoardPanel.add([overlay, panelBG, title, payBtn, payBtnText, adBtn, adBtnText, backBtn, backBtnText]);
     }
     hideClearBoardPanel() { if (this.clearBoardPanel) { this.clearBoardPanel.destroy(); this.clearBoardPanel = null; } }
     
     showNewDiscoveryPopup(itemType) {
-        // ... (код без изменений)
-// ... (весь остальной код showNewDiscoveryPopup остается без изменений, просто вставьте его сюда)
-// ...
         const screenW = this.game.config.width;
         const screenH = this.game.config.height;
 
@@ -487,9 +472,9 @@ export default class UIScene extends Phaser.Scene {
         this.tweens.add({ targets: item, scale: 1.5, duration: 500, ease: 'Back.out' });
         container.add(item);
 
-        const title = this.add.text(0, titleY, "NEW RECIPE!", { fontSize: '40px', color: '#FFF', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5);
-        const subTitle = this.add.text(0, subtitleY, "You discovered a new dish!", { fontSize: '24px', color: '#DDD', align: 'center', wordWrap: { width: screenW * 0.8 } }).setOrigin(0.5);
-        const tip = this.add.text(0, tipY, "(Tap anywhere to close)", { fontSize: '18px', color: '#888' }).setOrigin(0.5);
+        const title = this.add.text(0, titleY, localizationManager.getString('popup_new_recipe_title'), { fontSize: '40px', color: '#FFF', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5);
+        const subTitle = this.add.text(0, subtitleY, localizationManager.getString('popup_new_recipe_subtitle'), { fontSize: '24px', color: '#DDD', align: 'center', wordWrap: { width: screenW * 0.8 } }).setOrigin(0.5);
+        const tip = this.add.text(0, tipY, localizationManager.getString('popup_tap_to_close'), { fontSize: '18px', color: '#888' }).setOrigin(0.5);
         container.add([title, subTitle, tip]);
 
         let isClosing = false;
@@ -515,22 +500,30 @@ export default class UIScene extends Phaser.Scene {
         overlay.on('pointerdown', closePopup);
     }
     
-    // --- НОВЫЕ МЕТОДЫ ДЛЯ ОКНА ПОДТВЕРЖДЕНИЯ ---
     showTrashConfirmationPanel(gameObject) {
         if (this.trashConfirmationPanel) return;
 
+        const itemType = gameObject.getData('type');
+        const itemName = localizationManager.getString(`item_${itemType}`);
+        const itemScale = gameObject.getData('baseScale');
+
         this.trashConfirmationPanel = this.add.container(this.game.config.width / 2, this.game.config.height / 2);
-        this.trashConfirmationPanel.setDepth(600); // Выше, чем попап нового рецепта
+        this.trashConfirmationPanel.setDepth(600); 
 
         const overlay = this.add.rectangle(0, 0, this.game.config.width, this.game.config.height, 0x000000, 0.7).setInteractive();
-        const panelBG = this.add.graphics().fillStyle(0x333333, 1).lineStyle(2, 0xffffff, 1).fillRoundedRect(-200, -125, 400, 250, 16);
-        const title = this.add.text(0, -80, "Delete item?", { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
-        
-        const confirmBtn = this.add.image(-80, 40, 'button').setInteractive();
-        this.add.text(confirmBtn.x, confirmBtn.y, "Yes", { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+        const panelBG = this.add.graphics().fillStyle(0x333333, 1).lineStyle(2, 0xffffff, 1).fillRoundedRect(-250, -200, 500, 500, 16);
+        const title = this.add.text(0, -150, localizationManager.getString('trash_confirm_title_generic'), { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
 
-        const cancelBtn = this.add.image(80, 40, 'button').setInteractive();
-        this.add.text(cancelBtn.x, cancelBtn.y, "No", { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+        const itemImage = this.add.sprite(0, -50, itemType).setScale(itemScale);
+        const itemNameText = this.add.text(0, 20, itemName, { fontSize: '28px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+        
+        const confirmBtn = this.add.image(0, 110, 'button').setScale(1.2).setInteractive().setTint(0xffcccc);
+        const confirmBtnText = this.add.text(confirmBtn.x, confirmBtn.y, localizationManager.getString('btn_yes'), { fontSize: '32px', fill: '#000' }).setOrigin(0.5);
+        this.applyButtonClickAnimation(confirmBtn);
+
+        const cancelBtn = this.add.image(0, 230, 'button').setInteractive();
+        const cancelBtnText = this.add.text(cancelBtn.x, cancelBtn.y, localizationManager.getString('btn_no'), { fontSize: '28px', fill: '#000' }).setOrigin(0.5);
+        this.applyButtonClickAnimation(cancelBtn);
 
         confirmBtn.on('pointerdown', () => {
             this.sound.play('click');
@@ -544,7 +537,7 @@ export default class UIScene extends Phaser.Scene {
             this.hideTrashConfirmationPanel();
         });
 
-        this.trashConfirmationPanel.add([overlay, panelBG, title, confirmBtn, cancelBtn]);
+        this.trashConfirmationPanel.add([overlay, panelBG, title, itemImage, itemNameText, confirmBtn, confirmBtnText, cancelBtn, cancelBtnText]);
     }
 
     hideTrashConfirmationPanel() {
@@ -552,5 +545,34 @@ export default class UIScene extends Phaser.Scene {
             this.trashConfirmationPanel.destroy();
             this.trashConfirmationPanel = null;
         }
+    }
+
+    applyButtonClickAnimation(button) {
+        if (!button || !button.scene) return;
+        const originalScale = button.scale;
+        button.on('pointerdown', () => {
+            this.tweens.add({
+                targets: button,
+                scale: originalScale * 0.9,
+                duration: 50,
+                ease: 'Quad.easeOut'
+            });
+        });
+        button.on('pointerup', () => {
+            this.tweens.add({
+                targets: button,
+                scale: originalScale,
+                duration: 100,
+                ease: 'Back.easeOut'
+            });
+        });
+        button.on('pointerout', () => {
+             this.tweens.add({
+                targets: button,
+                scale: originalScale,
+                duration: 100,
+                ease: 'Back.easeOut'
+            });
+        });
     }
 }
