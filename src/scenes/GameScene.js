@@ -12,9 +12,9 @@ export default class GameScene extends Phaser.Scene {
     }
 
     init(data) {
+        // ИЗМЕНЕНИЕ: Логика продолжения после просмотра рекламы (без очков, они в DataManager)
         this.shouldContinueFromGameOver = data.continueGame || false;
         this.gridStateFromGameOver = data.gridState || null;
-        this.scoreFromGameOver = data.score || 0;
         this.events.on('resume', this.onSceneResume, this);
     }
 
@@ -26,7 +26,6 @@ export default class GameScene extends Phaser.Scene {
         this.GRID_START_X = (this.game.config.width - (this.GRID_COLS * this.CELL_SIZE)) / 2;
         this.GRID_START_Y = 320; 
         
-        this.score = 0;
         this.ingredientsGroup = this.add.group();
         
         this.sessionStartTime = Date.now();
@@ -62,20 +61,18 @@ export default class GameScene extends Phaser.Scene {
         
         this.createGeneratorDock();
         
+        // ИЗМЕНЕНИЕ: Логика восстановления и старта игры теперь не управляет очками напрямую
         if (this.shouldContinueFromGameOver && this.gridStateFromGameOver) {
-            this.score = this.scoreFromGameOver;
             this.restoreAfterAd(this.gridStateFromGameOver);
         } else {
             const savedGrid = dataManager.getGridState();
-            const savedScore = dataManager.getScore();
             if (savedGrid && savedGrid.length > 0) {
-                this.score = savedScore;
                 this.restoreGrid(savedGrid);
             } else {
                 this.startNewGame();
             }
         }
-        this.events.emit('updateScore', this.score); 
+        this.events.emit('updateScore', dataManager.getTotalScore()); 
         this.events.emit('updateCoins', dataManager.getCoins());
     }
 
@@ -85,7 +82,8 @@ export default class GameScene extends Phaser.Scene {
             const capacity = dataManager.getCurrentGeneratorValue(generatorId, 'capacity');
             
             if (state.charges < capacity) {
-                const cooldown = dataManager.getCurrentGeneratorValue(generatorId, 'speed');
+                // ИЗМЕНЕНИЕ: Получаем актуальный кулдаун из двухфазной системы
+                const cooldown = dataManager.getGeneratorCooldown(generatorId);
                 const now = Date.now();
                 const timePassed = (now - state.lastChargeTimestamp) / 1000;
 
@@ -94,6 +92,11 @@ export default class GameScene extends Phaser.Scene {
                     const newCharges = Math.min(capacity, state.charges + chargesToAdd);
                     
                     if (newCharges > state.charges) {
+                        // ИЗМЕНЕНИЕ: Записываем, что произошла перезарядка
+                        for(let i = 0; i < chargesToAdd; i++) {
+                            dataManager.recordGeneratorRestart(generatorId);
+                        }
+                        
                         state.charges = newCharges;
                         state.lastChargeTimestamp += chargesToAdd * cooldown * 1000;
                         dataManager.setGeneratorState(generatorId, state);
@@ -105,7 +108,6 @@ export default class GameScene extends Phaser.Scene {
     }
 
     onTrashHover(gameObject) {
-        // --- ИЗМЕНЕНИЕ: Не выключаем систему ввода, а просто скрываем объект
         gameObject.setVisible(false);
         const uiScene = this.scene.get('UIScene');
         if (uiScene) {
@@ -121,7 +123,6 @@ export default class GameScene extends Phaser.Scene {
     }
 
     onTrashCancel(gameObject) {
-        // --- ИЗМЕНЕНИЕ: Делаем объект видимым обратно
         gameObject.setVisible(true);
         this.resetAllVisuals();
         this.snapToGrid(gameObject);
@@ -274,6 +275,8 @@ export default class GameScene extends Phaser.Scene {
 
         const capacity = dataManager.getCurrentGeneratorValue(generatorId, 'capacity');
         if (state.charges === capacity) {
+            // ИЗМЕНЕНИЕ: Регистрируем начало нового цикла перезарядки
+            dataManager.recordGeneratorRestart(generatorId);
             state.lastChargeTimestamp = Date.now();
         }
         state.charges--;
@@ -302,7 +305,6 @@ export default class GameScene extends Phaser.Scene {
                 tempSprite.destroy();
                 this.createIngredient(emptyCell.x, emptyCell.y, itemType);
                 this.updateGridSave();
-                this.checkGameOverConditions();
                 this.isSpawning = false;
             }
         });
@@ -324,7 +326,8 @@ export default class GameScene extends Phaser.Scene {
             ui.chargesText.setVisible(false);
             ui.timerText.setVisible(true);
             
-            const cooldown = dataManager.getCurrentGeneratorValue(generatorId, 'speed');
+            // ИЗМЕНЕНИЕ: Получаем актуальный кулдаун из двухфазной системы
+            const cooldown = dataManager.getGeneratorCooldown(generatorId);
             const timePassed = (Date.now() - state.lastChargeTimestamp) / 1000;
             const timeRemaining = Math.max(0, cooldown - timePassed);
             const minutes = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
@@ -351,7 +354,6 @@ export default class GameScene extends Phaser.Scene {
 
     updateGridSave() {
         dataManager.setGridState(this.saveGridState());
-        dataManager.setScore(this.score);
     }
 
     handleDrop(draggedObject, gridX, gridY) {
@@ -368,7 +370,6 @@ export default class GameScene extends Phaser.Scene {
         
         this.snapToGrid(draggedObject);
         this.updateGridSave();
-        this.checkGameOverConditions();
     }
 
     handleMerge(draggedObject, targetObject, recipe) {
@@ -383,9 +384,11 @@ export default class GameScene extends Phaser.Scene {
         const coinBonus = 1 + (knifeLevel * 0.1);
         const scoreToAdd = Math.round(recipe.score * scoreBonus);
         const coinsToAdd = Math.round(recipe.coins * coinBonus);
-        this.score += scoreToAdd;
+        
+        // ИЗМЕНЕНИЕ: Начисляем очки через DataManager
+        dataManager.addScore(scoreToAdd);
         dataManager.addCoins(coinsToAdd);
-        this.events.emit('updateScore', this.score);
+        this.events.emit('updateScore', dataManager.getTotalScore());
         this.events.emit('updateCoins', dataManager.getCoins());
         
         const isNewUnlock = dataManager.unlockIngredient(recipe.output);
@@ -436,7 +439,6 @@ export default class GameScene extends Phaser.Scene {
                             ],
                              onComplete: () => {
                                 this.updateGridSave();
-                                this.checkGameOverConditions();
                             }
                         });
                     }
@@ -446,11 +448,11 @@ export default class GameScene extends Phaser.Scene {
     }
 
     startNewGame() {
-        this.score = 0;
-        dataManager.setScore(0);
+        // ИЗМЕНЕНИЕ: Очки больше не управляются сценой
         dataManager.startSessionTracking();
-        this.addCollectedItemsToGrid(TILE_TYPES.EGG, 2);
-        this.addCollectedItemsToGrid(TILE_TYPES.TOMATO, 2);
+        // ИЗМЕНЕНИЕ: Увеличено количество стартовых предметов
+        this.addCollectedItemsToGrid(TILE_TYPES.EGG, 4);
+        this.addCollectedItemsToGrid(TILE_TYPES.TOMATO, 4);
         this.updateGridSave();
     }
     
@@ -467,8 +469,7 @@ export default class GameScene extends Phaser.Scene {
                 this.ingredientsGroup.clear(true, true);
                 this.gridManager.clear();
                 this.startNewGame(); 
-                this.score = 0;
-                this.events.emit('updateScore', this.score);
+                this.events.emit('updateScore', dataManager.getTotalScore());
             }
         });
     }
@@ -483,67 +484,13 @@ export default class GameScene extends Phaser.Scene {
             }
         }
         this.updateGridSave();
-        this.checkGameOverConditions();
-    }
-
-    triggerGameOver() {
-        this.events.emit('hideUI');
-        dataManager.clearGridState();
-        const sessionDuration = Math.round((Date.now() - this.sessionStartTime) / 1000);
-        const coinsEarned = dataManager.getCoinsEarnedThisSession();
-        
-        const currentGridState = this.saveGridState();
-        
-        this.scene.start('GameOverScene', { 
-            score: this.score, 
-            gridState: currentGridState,
-            sessionDuration: sessionDuration,
-            coinsEarned: coinsEarned
-        });
     }
     
-    checkGameOverConditions() {
-        if (this.checkForPossibleMoves()) {
-            return;
-        }
-
-        const boardIsFull = !this.gridManager.findEmptyCell();
-        const generatorsAreEmpty = this.areGeneratorsEmpty();
-        
-        if (boardIsFull && generatorsAreEmpty) {
-            this.triggerGameOver();
-        }
-    }
-
-    areGeneratorsEmpty() {
-        for (const id in GENERATORS) {
-            const state = dataManager.getGeneratorState(id);
-            if (state.charges > 0) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    checkForPossibleMoves() {
-        const items = this.ingredientsGroup.getChildren();
-        const typeCounts = {};
-        for(const item of items) {
-            const type = item.getData('type');
-            if(!typeCounts[type]) typeCounts[type] = 0;
-            typeCounts[type]++;
-        }
-        for (const type in typeCounts) {
-            if (typeCounts[type] >= 2) {
-                if (this.mergeSystem.findRecipe(type, type)) return true;
-            }
-            for (const otherType in typeCounts) {
-                if (type === otherType) continue;
-                if (this.mergeSystem.findRecipe(type, otherType)) return true;
-            }
-        }
-        return false;
-    }
+    // ИЗМЕНЕНИЕ: Вся логика Game Over удалена
+    // triggerGameOver() {}
+    // checkGameOverConditions() {}
+    // areGeneratorsEmpty() {}
+    // checkForPossibleMoves() {}
 
     saveGridState() {
         const state = [];
@@ -588,7 +535,6 @@ export default class GameScene extends Phaser.Scene {
         }
         dataManager.save(true);
         this.updateGridSave();
-        this.checkGameOverConditions();
     }
 
     createIngredient(gridX, gridY, type) {
@@ -679,7 +625,6 @@ export default class GameScene extends Phaser.Scene {
             onComplete: () => {
                 item.destroy();
                 this.updateGridSave();
-                this.checkGameOverConditions();
             }
         });
     }

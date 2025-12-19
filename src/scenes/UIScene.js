@@ -20,10 +20,10 @@ export default class UIScene extends Phaser.Scene {
         this.scoreText = this.add.text(20, 20, '', textStyle);
         this.coinsText = this.add.text(20, 55, '', textStyle);
         
-        this.gameScene.events.on('updateScore', this.updateScore, this);
-        this.gameScene.events.on('updateCoins', this.updateCoins, this);
+        this.gameScene.events.on('updateScore', (score) => this.updateScore(score), this);
+        this.gameScene.events.on('updateCoins', (coins) => this.updateCoins(coins), this);
         this.gameScene.events.on('newRecipeUnlocked', this.showNewDiscoveryPopup, this);
-        this.updateScore(this.gameScene.score);
+        this.updateScore(dataManager.getTotalScore());
         this.updateCoins(dataManager.getCoins());
         
         const settingsBtn = this.add.image(this.game.config.width - 40, 50, 'button').setScale(0.7).setInteractive();
@@ -35,8 +35,37 @@ export default class UIScene extends Phaser.Scene {
             this.scene.pause('GameScene');
             this.scene.launch('SettingsScene');
         });
+        
+        const lbBtn = this.add.image(this.game.config.width - 40, 110, 'button').setScale(0.7).setInteractive();
+        const lbText = this.add.text(lbBtn.x, lbBtn.y, '🏆', { fontSize: '30px' }).setOrigin(0.5);
+        this.applyButtonClickAnimation(lbBtn);
+        
+        lbBtn.on('pointerdown', async () => {
+            this.sound.play('click');
+            
+            if (!window.ysdk) {
+                console.warn('Leaderboard feature is not available (No SDK).');
+                return;
+            }
 
-        this.trashBin = this.add.image(this.game.config.width - 60, this.game.config.height - 180, 'button').setScale(1.0).setInteractive();
+            lbText.setText('...');
+            lbBtn.disableInteractive();
+
+            try {
+                const lb = await window.ysdk.getLeaderboards();
+                await lb.setLeaderboardScore('weekly_tournament', dataManager.getWeeklyScore());
+                console.log('Weekly score submitted:', dataManager.getWeeklyScore());
+                lb.openLeaderboard({ leaderboardName: 'weekly_tournament' });
+            } catch (err) {
+                console.error('Failed to open or submit to leaderboard:', err);
+            } finally {
+                lbText.setText('🏆');
+                lbBtn.setInteractive();
+            }
+        });
+
+        // ИЗМЕНЕНИЕ: Корзина опущена ниже, чтобы не мешать сетке
+        this.trashBin = this.add.image(this.game.config.width - 60, this.game.config.height - 60, 'button').setScale(1.0).setInteractive();
         this.trashBin.setTint(0xFFaaaa); 
         this.add.text(this.trashBin.x, this.trashBin.y, '🗑️', { fontSize: '40px' }).setOrigin(0.5);
         this.applyButtonClickAnimation(this.trashBin);
@@ -60,19 +89,14 @@ export default class UIScene extends Phaser.Scene {
         });
         this.coinEmitter.setDepth(300);
 
-        this.uiContainer.add([ this.scoreText, this.coinsText, settingsBtn, this.trashBin, this.ordersContainer ]);
+        this.uiContainer.add([ this.scoreText, this.coinsText, settingsBtn, lbBtn, lbText, this.trashBin, this.ordersContainer ]);
 
         const gameEvents = this.gameScene.events;
-        gameEvents.on('hideUI', () => this.uiContainer.setVisible(false), this);
-        gameEvents.on('showUI', () => this.uiContainer.setVisible(true), this);
-        
         this.events.on('shutdown', () => {
             gameEvents.off('updateScore', this.updateScore, this);
             gameEvents.off('updateCoins', this.updateCoins, this);
-            gameEvents.off('hideUI');
-            gameEvents.off('showUI');
             gameEvents.off('newRecipeUnlocked', this.showNewDiscoveryPopup, this);
-            this.orderUpdateTimer.destroy();
+            if (this.orderUpdateTimer) this.orderUpdateTimer.destroy();
         });
     }
 

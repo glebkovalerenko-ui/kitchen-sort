@@ -3,7 +3,6 @@ import Phaser from 'phaser';
 import PreloaderScene from './scenes/PreloaderScene.js';
 import GameScene from './scenes/GameScene.js';
 import UIScene from './scenes/UIScene.js';
-import GameOverScene from './scenes/GameOverScene.js';
 import CollectionScene from './scenes/CollectionScene.js';
 import UpgradeScene from './scenes/UpgradeScene.js';
 import GeneratorScene from './scenes/GeneratorScene.js';
@@ -14,7 +13,7 @@ const config = {
     type: Phaser.AUTO,
     width: 800,
     height: 1000,
-    scene: [PreloaderScene, GameScene, UIScene, GameOverScene, CollectionScene, UpgradeScene, GeneratorScene, SettingsScene],
+    scene: [PreloaderScene, GameScene, UIScene, CollectionScene, UpgradeScene, GeneratorScene, SettingsScene],
     backgroundColor: '#333333',
     scale: {
         mode: Phaser.Scale.FIT,
