@@ -53,9 +53,22 @@ export default class UIScene extends Phaser.Scene {
 
             try {
                 const lb = await window.ysdk.getLeaderboards();
-                await lb.setLeaderboardScore('weekly_tournament', dataManager.getWeeklyScore());
-                console.log('Weekly score submitted:', dataManager.getWeeklyScore());
-                lb.openLeaderboard({ leaderboardName: 'weekly_tournament' });
+                
+                // --- ИЗМЕНЕНИЕ: Используем новую систему генерации имен ---
+                const weeklyLbName = dataManager.getWeeklyLeaderboardName();
+                const allTimeLbName = 'allTimeBest';
+
+                // 1. Отправляем недельный счет в динамическую таблицу
+                await lb.setLeaderboardScore(weeklyLbName, dataManager.getWeeklyScore());
+                console.log(`Weekly score submitted to [${weeklyLbName}]:`, dataManager.getWeeklyScore());
+                
+                // 2. В фоне обновляем вечный рекорд
+                await lb.setLeaderboardScore(allTimeLbName, dataManager.getTotalScore());
+                console.log(`All-time score submitted to [${allTimeLbName}]:`, dataManager.getTotalScore());
+
+                // 3. Открываем игроку НЕДЕЛЬНУЮ таблицу для просмотра
+                lb.openLeaderboard({ leaderboardName: weeklyLbName });
+
             } catch (err) {
                 console.error('Failed to open or submit to leaderboard:', err);
             } finally {
@@ -64,8 +77,7 @@ export default class UIScene extends Phaser.Scene {
             }
         });
 
-        // ИЗМЕНЕНИЕ: Корзина опущена ниже, чтобы не мешать сетке
-        this.trashBin = this.add.image(this.game.config.width - 60, this.game.config.height - 60, 'button').setScale(1.0).setInteractive();
+        this.trashBin = this.add.image(this.game.config.width - 60, this.game.config.height - 80, 'button').setScale(1.0).setInteractive();
         this.trashBin.setTint(0xFFaaaa); 
         this.add.text(this.trashBin.x, this.trashBin.y, '🗑️', { fontSize: '40px' }).setOrigin(0.5);
         this.applyButtonClickAnimation(this.trashBin);

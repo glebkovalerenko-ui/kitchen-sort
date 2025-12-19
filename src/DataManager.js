@@ -119,6 +119,33 @@ class DataManager {
         }
     }
 
+    // --- НОВЫЙ БЛОК: ВСЯ ЛОГИКА ДЛЯ ЛИДЕРБОРДОВ ---
+
+    /**
+     * Вычисляет номер недели по стандарту ISO 8601.
+     * @param {Date} d - Дата.
+     * @returns {number} Номер недели.
+     */
+    getWeekNumber(d) {
+        d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+        d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+        return weekNo;
+    }
+
+    /**
+     * Генерирует техническое имя для текущего еженедельного лидерборда.
+     * @returns {string} Имя в формате "weeklyY<ГОД>W<НОМЕР_НЕДЕЛИ>".
+     */
+    getWeeklyLeaderboardName() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const week = this.getWeekNumber(now);
+        const paddedWeek = week.toString().padStart(2, '0'); // Добавляет ведущий ноль, например W1 -> W01
+        return `weeklyY${year}W${paddedWeek}`;
+    }
+
     _checkWeeklyReset() {
         const now = new Date();
         const lastReset = new Date(this.playerData.lastWeeklyResetTimestamp);
@@ -134,6 +161,8 @@ class DataManager {
             this.save(true);
         }
     }
+    
+    // --- КОНЕЦ БЛОКА ЛИДЕРБОРДОВ ---
 
     canShowInterstitial() {
         if (!this.playerData) return false;
@@ -225,13 +254,9 @@ class DataManager {
 
     fulfillOrder(orderId) {
         if (!this.playerData) return false;
-
         const orderIndex = this.playerData.orders.activeOrders.findIndex(o => o.id === orderId);
         const slotIndex = this.playerData.orders.orderSlots.findIndex(s => s.orderId === orderId);
-
-        if (orderIndex === -1 || slotIndex === -1) {
-            return false;
-        }
+        if (orderIndex === -1 || slotIndex === -1) return false;
 
         const order = this.playerData.orders.activeOrders[orderIndex];
         this.addCoins(order.coinReward);
@@ -244,8 +269,7 @@ class DataManager {
             const baseCooldown = 10000;
             const step = Math.floor(this.playerData.completedOrdersCount / 10);
             cooldown = baseCooldown + (step * 5000);
-        } 
-        else {
+        } else {
             const tier = ITEM_TIERS[order.itemType] || 2;
             if (tier <= 3) cooldown = 45000;
             else if (tier <= 5) cooldown = 180000;
@@ -255,7 +279,6 @@ class DataManager {
         this.playerData.orders.orderSlots[slotIndex].cooldownUntil = Date.now() + cooldown;
         this.playerData.orders.orderSlots[slotIndex].orderId = null;
         this.playerData.completedOrdersCount++;
-        
         this.save(true);
         return true;
     }
@@ -283,21 +306,13 @@ class DataManager {
     }
     
     _generateAndPlaceNewOrder(slotIndex) {
-        const tutorialOrderSequence = [
-            TILE_TYPES.FRIED_EGG,
-            TILE_TYPES.DICED_TOMATOES,
-            TILE_TYPES.OMELLETE
-        ];
-        
+        const tutorialOrderSequence = [TILE_TYPES.FRIED_EGG, TILE_TYPES.DICED_TOMATOES, TILE_TYPES.OMELLETE];
         let newOrder = null;
         const completedCount = this.playerData.completedOrdersCount;
 
-        // --- ИСПРАВЛЕНИЕ: Новая, более надежная логика для обучающих заказов ---
         if (completedCount < tutorialOrderSequence.length) {
             const nextTutorialItem = tutorialOrderSequence[completedCount];
             const isAlreadyActive = this.playerData.orders.activeOrders.some(o => o.itemType === nextTutorialItem);
-
-            // Генерируем следующий обучающий заказ, только если его еще нет на доске
             if (!isAlreadyActive) {
                 const recipe = RECIPES.find(r => r.output === nextTutorialItem);
                 newOrder = {
@@ -307,9 +322,7 @@ class DataManager {
                     difficulty: 'EASY'
                 };
             }
-        } 
-        // Если обучение пройдено, переходим к обычной генерации
-        else {
+        } else {
             newOrder = this.orderSystem.generateNewOrder(this.playerData.unlockedItems);
         }
 
@@ -346,10 +359,7 @@ class DataManager {
             return { charges: 0, lastChargeTimestamp: Date.now(), capacityLevel: 0, speedLevel: 0, bonusLevel: 0 };
         }
         if (!this.playerData.generators[generatorId]) {
-            this.playerData.generators[generatorId] = {
-                charges: 15, lastChargeTimestamp: Date.now(),
-                capacityLevel: 0, speedLevel: 0, bonusLevel: 0
-            };
+            this.playerData.generators[generatorId] = { charges: 15, lastChargeTimestamp: Date.now(), capacityLevel: 0, speedLevel: 0, bonusLevel: 0 };
             this.markDirty();
         }
         return this.playerData.generators[generatorId];
@@ -374,7 +384,6 @@ class DataManager {
     getCurrentGeneratorValue(generatorId, upgradeType) {
         const config = GENERATORS[generatorId].upgrades[upgradeType];
         const level = this.getGeneratorUpgradeLevel(generatorId, upgradeType);
-        
         if (upgradeType === 'speed') {
             return config.baseValue * Math.pow(0.95, level);
         } else {
@@ -384,16 +393,13 @@ class DataManager {
 
     getGeneratorCooldown(generatorId) {
         const unlockedCount = this.getUnlockedRecipesCount();
-
         if (unlockedCount < 15) {
             const restarts = this.playerData.generatorRestarts[generatorId] || 0;
-            if (restarts < 5) return 15; 
-            
+            if (restarts < 5) return 15;
             const baseCooldown = 15;
             const step = Math.floor((restarts - 5) / 5);
             return baseCooldown + (step * 15);
-        }
-        else {
+        } else {
             return this.getCurrentGeneratorValue(generatorId, 'speed');
         }
     }
@@ -426,14 +432,9 @@ class DataManager {
             savedGrid: null,
             lastInterstitialShowTimestamp: 0,
             firstPlayTimestamp: Date.now(),
-            gadgets: {
-                knifeLevel: 0,
-                spatulaLevel: 0
-            },
+            gadgets: { knifeLevel: 0, spatulaLevel: 0 },
             generators: {},
-            settings: {
-                isMuted: false
-            },
+            settings: { isMuted: false },
             orders: {
                 activeOrders: [],
                 orderSlots: Array(ORDERS_CONFIG.MAX_ACTIVE_ORDERS).fill(0).map(() => ({ orderId: null, cooldownUntil: 0 }))
@@ -442,10 +443,7 @@ class DataManager {
             weeklyScore: 0,
             lastWeeklyResetTimestamp: 0,
             completedOrdersCount: 0,
-            generatorRestarts: {
-                coop: 0,
-                greenhouse: 0
-            }
+            generatorRestarts: { coop: 0, greenhouse: 0 }
         };
     }
 }
